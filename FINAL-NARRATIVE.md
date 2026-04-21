@@ -24,8 +24,8 @@ They earn **$665K/year** in staking rewards just for voting on their own platfor
 A permissionless factory contract produced **89 "DesignatedVotingV2" contracts** between February 2023 and February 2026. We verified `holdsRole(0, Safe)` on **ALL 89 contracts** using the correct function selector (`0x7cdc1cb9`). Result: **86 of 89 are owned by the same Safe multisig** (0x8180d59b). Only 3 are independently owned.
 
 **Exhaustive verification** (not sampled — every single contract checked):
-- 86 contracts: `holdsRole(0, 0x8180d59b...) = TRUE` (Safe is owner)
-- 3 contracts: `holdsRole(0, 0x8180d59b...) = FALSE`
+- 86 contracts: `holdsRole(0, 0x8180d59b7175d4064bdfa8138a58e9babffda44a) = TRUE` (Safe is owner)
+- 3 contracts: `holdsRole(0, 0x8180d59b7175d4064bdfa8138a58e9babffda44a) = FALSE`
   - #1 (0x2ba1e904): Owned by Risk Labs: Deployer directly (0x9a8f92a8)
   - #56 (0xdd781a04): Owned by independent user (0xb51d0852)
   - #78 (0xdef630ea): Owned by independent user (0x1076188b)
@@ -94,7 +94,7 @@ We queried vote reveals from the UMA V2 subgraph for 4 wallets (3 DV2 + Kevin Ch
 **Round 10275 (cleanest proof):** 10 price requests. All 4 wallets voted the EXACT same value on all 10. 100% correlation.
 
 ```
-Query: revealedVotes(where: {voter_in: ["0x0afc...", "0x487a...", "0x326c...", "0xd2a7..."], roundId: "10275"})
+Query: revealedVotes(where: {voter_in: ["0x0afc9a935960948ed35e50ac7639cbb38e840b38", "0x487a5bbdc6091be0e27c0e8ea283047d94862538", "0x326c819380b8842e3a55e5f97f6011ee91844205", "0xd2a78bb82389d30075144d17e782964918999f7f"], roundId: "10275"})
 Result: 40 votes (4 wallets × 10 requests). ALL prices identical.
 ```
 
@@ -143,7 +143,7 @@ Kevin Chan is functionally part of the same voting bloc. His wallet and the DV2 
 
 | Wallet | Withdrawn (UMA) | USD (at $0.46) | Verify |
 |--------|----------------|----------------|--------|
-| Kevin Chan | 927,785 | $429,374 | [Subgraph query](https://api.goldsky.com/api/public/project_clus2fndawbcc01w31192938i/subgraphs/mainnet-voting-v2/0.1.1/gn) — `voter(id:"0xd2a78bb8...")` |
+| Kevin Chan | 927,785 | $429,374 | [Subgraph query](https://api.goldsky.com/api/public/project_clus2fndawbcc01w31192938i/subgraphs/mainnet-voting-v2/0.1.1/gn) — `voter(id:"0xd2a78bb82389d30075144d17e782964918999f7f")` |
 | BornTooLate | 966,900 | $447,487 | Same subgraph, different ID |
 | DV2 #1 (0x0afc) | 383,581 | $177,545 | Same |
 | DV2 #2 (0x487a) | 369,967 | $171,195 | Same |
@@ -238,7 +238,7 @@ Verify:
 
 | Entity | UMA Controlled | Confidence | How to Verify |
 |--------|---------------|-----------|---------------|
-| Kevin Chan (Treasurer, maxodds.eth) | 1,520,241 | PROVEN | [Subgraph query](https://api.goldsky.com/api/public/project_clus2fndawbcc01w31192938i/subgraphs/mainnet-voting-v2/0.1.1/gn): `voter(id:"0xd2a78bb8...")` |
+| Kevin Chan (Treasurer, maxodds.eth) | 1,520,241 | PROVEN | [Subgraph query](https://api.goldsky.com/api/public/project_clus2fndawbcc01w31192938i/subgraphs/mainnet-voting-v2/0.1.1/gn): `voter(id:"0xd2a78bb82389d30075144d17e782964918999f7f")` |
 | DV2 #1 (Safe-owned, verified) | 831,304 | PROVEN | holdsRole(0) = TRUE, [Etherscan](https://etherscan.io/address/0x0afc9a935960948ed35e50ac7639cbb38e840b38#readProxyContract) |
 | DV2 #2 (Safe-owned, verified) | 678,803 | PROVEN | holdsRole(0) = TRUE, [Etherscan](https://etherscan.io/address/0x487a5bbdc6091be0e27c0e8ea283047d94862538#readProxyContract) |
 | Wallet #3 (Safe-funded Oct 2024) | 803,276 | PROVEN | [Etherscan token transfers](https://etherscan.io/address/0x95cd0e455cf41e9f8cca8eee488432f3f10f29b8#tokentxns) |
