@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UMA / Polymarket — Entity & Dispute Connection Map</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0e1a; color: #e0e0e0; font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; overflow: hidden; }
+
+#graph { width: 100vw; height: 100vh; }
+
+.node circle {
+  stroke-width: 2.5px;
+  cursor: pointer;
+  transition: r 0.2s, opacity 0.2s;
+}
+.node circle:hover { filter: brightness(1.3); }
+
+.node text {
+  font-size: 10px;
+  fill: #ccc;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.link {
+  stroke-opacity: 0.5;
+  fill: none;
+}
+
+.link-label {
+  font-size: 7px;
+  fill: #666;
+  pointer-events: none;
+}
+
+/* Tooltip */
+#tooltip {
+  position: absolute;
+  background: #13172a;
+  border: 1px solid #3a4a6a;
+  border-radius: 10px;
+  padding: 14px 18px;
+  font-size: 11px;
+  max-width: 420px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 200;
+  box-shadow: 0 6px 30px rgba(0,0,0,0.7);
+}
+#tooltip .tt-title { font-weight: bold; color: #fff; margin-bottom: 4px; font-size: 14px; }
+#tooltip .tt-group { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+#tooltip .tt-addr { color: #6af; font-size: 9px; word-break: break-all; margin-bottom: 8px; font-family: monospace; }
+#tooltip .tt-detail { color: #bbb; line-height: 1.6; font-size: 11px; }
+#tooltip .tt-stat { margin-top: 8px; padding-top: 8px; border-top: 1px solid #2a3a5a; }
+#tooltip .tt-stat span { color: #ff6b6b; font-weight: bold; }
+
+/* Title bar */
+#title-bar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 100;
+  pointer-events: none;
+}
+#title-bar h1 { font-size: 17px; color: #fff; letter-spacing: 1.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+#title-bar p { font-size: 10px; color: #666; margin-top: 4px; }
+
+/* Legend */
+#legend {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: rgba(10, 14, 26, 0.94);
+  border: 1px solid #2a3a5a;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 10px;
+  z-index: 100;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+#legend::-webkit-scrollbar { width: 4px; }
+#legend::-webkit-scrollbar-thumb { background: #3a4a6a; border-radius: 2px; }
+#legend h3 { color: #fff; margin-bottom: 8px; font-size: 12px; }
+.legend-item { display: flex; align-items: center; margin-bottom: 5px; cursor: pointer; user-select: none; }
+.legend-item:hover { color: #fff; }
+.legend-item.dimmed { opacity: 0.3; }
+.legend-dot { width: 11px; height: 11px; border-radius: 50%; margin-right: 8px; border: 2px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+.legend-line { width: 22px; height: 3px; margin-right: 8px; border-radius: 2px; flex-shrink: 0; }
+.legend-sep { height: 1px; background: #2a3a5a; margin: 8px 0; }
+
+/* Search */
+#search-box {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 100;
+}
+#search-input {
+  background: rgba(10, 14, 26, 0.94);
+  border: 1px solid #3a4a6a;
+  border-radius: 8px;
+  color: #e0e0e0;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-family: inherit;
+  width: 240px;
+  outline: none;
+}
+#search-input:focus { border-color: #6af; }
+#search-input::placeholder { color: #555; }
+#search-results {
+  background: rgba(10, 14, 26, 0.96);
+  border: 1px solid #3a4a6a;
+  border-radius: 0 0 8px 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  display: none;
+}
+.search-result-item {
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 10px;
+  border-bottom: 1px solid #1a2040;
+}
+.search-result-item:hover { background: #1a2a4a; }
+.search-result-item .sr-label { color: #fff; }
+.search-result-item .sr-group { color: #888; margin-left: 8px; font-size: 9px; }
+
+/* Detail panel */
+#detail-panel {
+  position: absolute;
+  top: 60px;
+  right: 14px;
+  width: 320px;
+  background: rgba(10, 14, 26, 0.96);
+  border: 1px solid #3a4a6a;
+  border-radius: 10px;
+  padding: 18px;
+  z-index: 100;
+  display: none;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+}
+#detail-panel::-webkit-scrollbar { width: 4px; }
+#detail-panel::-webkit-scrollbar-thumb { background: #3a4a6a; border-radius: 2px; }
+#detail-panel .dp-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  cursor: pointer;
+  color: #888;
+  font-size: 16px;
+}
+#detail-panel .dp-close:hover { color: #fff; }
+#detail-panel .dp-title { font-size: 15px; color: #fff; font-weight: bold; margin-bottom: 4px; padding-right: 24px; }
+#detail-panel .dp-group { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+#detail-panel .dp-addr { color: #6af; font-size: 9px; word-break: break-all; margin-bottom: 10px; font-family: monospace; }
+#detail-panel .dp-detail { color: #bbb; line-height: 1.6; font-size: 11px; margin-bottom: 12px; }
+#detail-panel .dp-links-title { color: #fff; font-size: 11px; margin-bottom: 6px; }
+#detail-panel .dp-link-item { font-size: 10px; color: #aaa; padding: 3px 0; border-bottom: 1px solid #1a2040; }
+#detail-panel .dp-link-item span { color: #6af; }
+
+/* Controls */
+#controls {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 100;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 500px;
+}
+#controls button {
+  background: #1a2040;
+  border: 1px solid #3a4a6a;
+  color: #ccc;
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+#controls button:hover { background: #2a3050; color: #fff; border-color: #5a6a8a; }
+#controls button.active { background: #2a4070; border-color: #6af; color: #fff; }
+
+/* Stats */
+#stats {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  background: rgba(10, 14, 26, 0.94);
+  border: 1px solid #2a3a5a;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 10px;
+  color: #777;
+  z-index: 100;
+  line-height: 1.7;
+  max-width: 400px;
+}
+#stats .stat-val { color: #ff6b6b; font-weight: bold; }
+#stats .stat-blue { color: #44aaff; font-weight: bold; }
+#stats .stat-amber { color: #ffaa00; font-weight: bold; }
+#stats .stat-green { color: #44ff88; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<div id="title-bar">
+  <h1>UMA / Polymarket -- Entity & Dispute Connection Map</h1>
+  <p>On-chain connections, dispute networks, and power flows | April 2026 Investigation | 1,800 disputes analyzed</p>
+</div>
+
+<div id="legend">
+  <h3>Node Types</h3>
+  <div class="legend-item" data-group="insider" onclick="toggleGroup('insider')"><div class="legend-dot" style="background:#ff4444"></div> Risk Labs Insider</div>
+  <div class="legend-item" data-group="dv2" onclick="toggleGroup('dv2')"><div class="legend-dot" style="background:#ff8800"></div> DV2 Contract</div>
+  <div class="legend-item" data-group="suspected" onclick="toggleGroup('suspected')"><div class="legend-dot" style="background:#ffcc00"></div> Suspected Insider</div>
+  <div class="legend-item" data-group="serial_disputer" onclick="toggleGroup('serial_disputer')"><div class="legend-dot" style="background:#ff6b6b"></div> Serial Disputer</div>
+  <div class="legend-item" data-group="adapter" onclick="toggleGroup('adapter')"><div class="legend-dot" style="background:#44aaff"></div> Adapter Contract</div>
+  <div class="legend-item" data-group="proposer" onclick="toggleGroup('proposer')"><div class="legend-dot" style="background:#ffaa00"></div> Top Proposer</div>
+  <div class="legend-item" data-group="protocol" onclick="toggleGroup('protocol')"><div class="legend-dot" style="background:#44ff88"></div> Protocol / Platform</div>
+  <div class="legend-item" data-group="vc" onclick="toggleGroup('vc')"><div class="legend-dot" style="background:#aa66ff"></div> VC / Investor</div>
+  <div class="legend-item" data-group="infra" onclick="toggleGroup('infra')"><div class="legend-dot" style="background:#5588bb"></div> Infrastructure / Safe</div>
+  <div class="legend-item" data-group="external" onclick="toggleGroup('external')"><div class="legend-dot" style="background:#888"></div> External</div>
+  <div class="legend-sep"></div>
+  <h3>Edge Types</h3>
+  <div class="legend-item"><div class="legend-line" style="background:#ff4444"></div> Controls / Signs</div>
+  <div class="legend-item"><div class="legend-line" style="background:#ffcc00"></div> Funds / Deploys</div>
+  <div class="legend-item"><div class="legend-line" style="background:#44aaff"></div> Invested In</div>
+  <div class="legend-item"><div class="legend-line" style="background:#ff6b6b"></div> Disputes Through</div>
+  <div class="legend-item"><div class="legend-line" style="background:#44ff88"></div> Resolves / Sends</div>
+  <div class="legend-item"><div class="legend-line" style="background:#666"></div> Associated</div>
+  <div class="legend-sep"></div>
+  <div style="font-size:9px;color:#555;line-height:1.5;">Click legend items to toggle visibility.<br>Click nodes for details. Drag to reposition.<br>Scroll to zoom. Double-click to pin/unpin.</div>
+</div>
+
+<div id="search-box">
+  <input type="text" id="search-input" placeholder="Search wallets, entities...">
+  <div id="search-results"></div>
+</div>
+
+<div id="detail-panel">
+  <div class="dp-close" onclick="closeDetail()">&times;</div>
+  <div class="dp-title"></div>
+  <div class="dp-group"></div>
+  <div class="dp-addr"></div>
+  <div class="dp-detail"></div>
+  <div class="dp-links-title">Connections:</div>
+  <div class="dp-links"></div>
+</div>
+
+<div id="stats">
+  <div>DV2 Safe controls: <span class="stat-val">86/89 DV2 contracts (6.76M UMA, 38.3%)</span></div>
+  <div>Kevin Chan (maxodds.eth): <span class="stat-val">1.52M UMA (8.6%)</span></div>
+  <div>Confirmed voting bloc: <span class="stat-val">64.4%</span> | With BornTooLate: <span class="stat-val">70.9%</span></div>
+  <div style="margin-top:4px">Total OOv2 disputes: <span class="stat-blue">1,800</span> | Adapter contracts: <span class="stat-blue">3</span></div>
+  <div>Top disputer (0x0db5): <span class="stat-val">160 disputes (92.5% win)</span> | Also proposer: <span class="stat-amber">66 proposals disputed</span></div>
+  <div>Top proposer (0x5369): <span class="stat-amber">90 proposals disputed</span></div>
+  <div style="margin-top:4px">Entities mapped: <span class="stat-green">50+</span> | Connections: <span class="stat-green">80+</span></div>
+</div>
+
+<div id="controls">
+  <button onclick="resetZoom()">Reset View</button>
+  <button onclick="toggleLabels()">Labels</button>
+  <button onclick="highlightBloc()">Voting Bloc</button>
+  <button onclick="highlightDisputers()">Disputers</button>
+  <button onclick="highlightProposers()">Proposers</button>
+  <button onclick="showAll()">Show All</button>
+  <button onclick="freezeLayout()">Freeze</button>
+</div>
+
+<div id="tooltip">
+  <div class="tt-title"></div>
+  <div class="tt-group"></div>
+  <div class="tt-addr"></div>
+  <div class="tt-detail"></div>
+</div>
+
+<svg id="graph"></svg>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ========== DATA ==========
+const nodes = [
+  // --- PEOPLE (Insiders) ---
+  { id: "hart", label: "Hart Lambur", group: "insider", type: "person", size: 20,
+    detail: "CEO, Risk Labs Foundation. Ex-Goldman Sachs. Controls DV2 Owner Safe + MOOV2 Whitelist Safe. Signs both sides of the oracle. hal2001.eth.",
+    addr: "hal2001.eth | 0xcc400c09...23e37d" },
+  { id: "kevin", label: "Kevin Chan", group: "insider", type: "person", size: 18,
+    detail: "#1 voter on EVERY controversial dispute. Risk Labs Treasurer. Caught using maxodds.eth + undisclosed wallets in Across DAO ($23M extraction). 1.52M UMA staked.",
+    addr: "maxodds.eth | 0xd2a78bb82389d30075144d17e782964918999f7f" },
+  { id: "allison", label: "Allison Lu", group: "insider", type: "person", size: 14,
+    detail: "Co-Founder Risk Labs. Ex-Goldman VP. MIT Economics.",
+    addr: "Unknown" },
+
+  // --- WALLETS (Named bloc) ---
+  { id: "maxodds", label: "maxodds.eth", group: "insider", type: "wallet", size: 16,
+    detail: "1,522,578 UMA staked. #1 voter ceasefire rounds. 99.81% agreement with DV2 bloc across 1,045 rounds.",
+    addr: "0xd2a78bb82389d30075144d17e782964918999f7f" },
+  { id: "borntoolate", label: "BornTooLate.eth", group: "suspected", type: "wallet", size: 15,
+    detail: "1,148,913 UMA still staked (#2 voter). 375K pending unstake. Known Ukraine 'attacker' forced $7M wrong resolution. Never banned. Still active.",
+    addr: "0xfc204fcfd2a579157898a212ea25ac98de2b1e1c" },
+  { id: "meeseeks", label: "meeseeks.eth", group: "suspected", type: "wallet", size: 13,
+    detail: "UNVERIFIED. Reported ~1M UMA, Tornado Cash funded. Not yet confirmed via subgraph. Included for research.",
+    addr: "0xfec2ade141272f5271febadfca5d21ca30fc04a5" },
+  { id: "w3", label: "Wallet #3", group: "suspected", type: "wallet", size: 14,
+    detail: "1,047,860 UMA. Coinbase-funded. 99.4% vote agreement with bloc across 2,400+ votes. Identical APR to 15 decimals.",
+    addr: "0x95cd0e455cf41e9f8cca8eee488432f3f10f29b8" },
+  { id: "w5", label: "Wallet #5", group: "suspected", type: "wallet", size: 13,
+    detail: "967,488 UMA. 99.6% vote agreement with bloc. Identical APR pattern. Commits +7 min (fast follower).",
+    addr: "0x05d184b066d72cd42a1fe0fb880c3d4a0adbf8c4" },
+  { id: "w4", label: "Wallet #4", group: "suspected", type: "wallet", size: 12,
+    detail: "451,107 UMA. Safe-funded Mar 25, 2026. Delegates to bot 0xaf4c. Migrated from emptied DV2 contract.",
+    addr: "0xeaf0f2eab859d1036ec14f8c4a1a9ac150e" },
+
+  // --- DV2 CONTRACTS ---
+  { id: "dv2_1", label: "DV2 #1", group: "dv2", type: "contract", size: 11,
+    detail: "831,304 UMA staked. DesignatedVotingV2. Deployed by Risk Labs Deployer.",
+    addr: "0x0afc9a935960948ed35e50ac7639cbb38e840b38" },
+  { id: "dv2_2", label: "DV2 #2", group: "dv2", type: "contract", size: 10,
+    detail: "678,803 UMA staked. DesignatedVotingV2. Same factory, same owner Safe.",
+    addr: "0x487a5bbdc6091be0e27c0e8ea283047d94862538" },
+  { id: "dv2_3", label: "DV2 #3", group: "dv2", type: "contract", size: 9,
+    detail: "449,359 UMA staked. Part of the 86 Safe-owned DV2 contracts.",
+    addr: "0x326c819380b8842e3a55e5f97f6011ee91844205" },
+  { id: "dv2_4", label: "DV2 #4", group: "dv2", type: "contract", size: 9,
+    detail: "415,169 UMA staked.",
+    addr: "0x66ca133ec691ca210251fcd4c963ba220515225a" },
+  { id: "dv2_5", label: "DV2 #5", group: "dv2", type: "contract", size: 8,
+    detail: "253,090 UMA staked.",
+    addr: "0x840bf8f06b175aa001b85cdb68b3378e8b14946f" },
+  { id: "dv2_6", label: "DV2 #6-86", group: "dv2", type: "contract", size: 8,
+    detail: "81 additional Safe-owned contracts. holdsRole verified on ALL 89 -- 86 TRUE, 3 FALSE. 96.6% owned by one Safe.",
+    addr: "Multiple (see report)" },
+
+  // --- SAFES / INFRA ---
+  { id: "dv2_safe", label: "DV2 Owner Safe", group: "infra", type: "safe", size: 19,
+    detail: "2-of-4 multisig. Controls 86/89 factory DV2 contracts. 6.76M UMA staked (38.3%). Hart Lambur = signer.",
+    addr: "0x8180d59b7175d4064bdfa8138a58e9babffda44a" },
+  { id: "moov2_safe", label: "MOOV2 Whitelist Safe", group: "infra", type: "safe", size: 17,
+    detail: "2-of-4 multisig. Controls who can PROPOSE resolutions on Polygon (UMIP-189). Hart Lambur = signer #4. 439+ whitelisted proposers.",
+    addr: "0x6ee4d971142afadea1828445124d6137080b4146" },
+  { id: "deployer", label: "Risk Labs: Deployer", group: "insider", type: "wallet", size: 14,
+    detail: "Deployed GovernorV2, VotingV2, 52/89 DV2 contracts. Etherscan-labeled. #1 on MOOV2 whitelist.",
+    addr: "0x9a8f92a830a5cb89a3816e3d267cb7791c16b04d" },
+  { id: "signer1", label: "Signer #1", group: "insider", type: "wallet", size: 11,
+    detail: "Risk Labs insider. Signs BOTH the DV2 Safe and MOOV2 Safe. Interacts with Across Protocol.",
+    addr: "0x363605c0bde9f1f5053ada30618d95dbfc109bf5" },
+  { id: "signer_funded", label: "Signer (Hart-funded)", group: "insider", type: "wallet", size: 11,
+    detail: "Unknown identity. Signs both Safes. FUNDED DIRECTLY BY HART LAMBUR.",
+    addr: "0x837219d7a9c666f5542c4559bf17d7b804e5c5fe" },
+  { id: "delegate_bot", label: "Delegate Bot", group: "infra", type: "wallet", size: 10,
+    detail: "Automated voting delegate. 827 txs. Daily multicall() on VotingV2. Votes for Wallet #4. Safe-funded.",
+    addr: "0xaf4c815cf13bc8671a2a12bde62aabec24651ccc" },
+  { id: "gas_rebate", label: "Gas Rebate Distributor", group: "infra", type: "wallet", size: 10,
+    detail: "Distributes ETH via Disperse.app for voting gas. Funded from Risk Labs Safe (23 txs, 219.37 ETH). Pays BornTooLate, DV2 contracts, and other voters.",
+    addr: "0x774bFF0CCD2f7546B67D4071DEF9Ba154bA549B1" },
+  { id: "governor", label: "GovernorV2", group: "infra", type: "contract", size: 14,
+    detail: "34.4M UMA (26.8% of supply). Risk Labs DAO treasury.",
+    addr: "0x7b29...fa8" },
+  { id: "proposer_bot", label: "Polygon Proposer Bot", group: "infra", type: "wallet", size: 10,
+    detail: "MOOV2-whitelisted proposer on Polygon. Proposes resolutions for Polymarket markets.",
+    addr: "MOOV2-whitelisted" },
+
+  // --- PROTOCOLS ---
+  { id: "uma", label: "UMA Protocol", group: "protocol", type: "protocol", size: 26,
+    detail: "Oracle protocol. $37-41M mcap. Secures $9B+ Polymarket. 0.155 UMA/sec emissions to stakers. DVM resolves disputes from OOv2.",
+    addr: "Ethereum L1" },
+  { id: "polymarket", label: "Polymarket", group: "protocol", type: "protocol", size: 24,
+    detail: "$15B valuation (Bloomberg Apr 2026). Largest prediction market. Depends on UMA for dispute resolution.",
+    addr: "Polygon" },
+  { id: "across", label: "Across Protocol", group: "protocol", type: "protocol", size: 14,
+    detail: "Cross-chain bridge by Risk Labs. $0 protocol revenue. $23M extracted via DAO governance manipulation.",
+    addr: "" },
+
+  // --- VCs ---
+  { id: "coinbase_v", label: "Coinbase Ventures", group: "vc", type: "vc", size: 13,
+    detail: "Invested in BOTH UMA (2018 seed) AND Polymarket (2025). Dual conflict of interest.",
+    addr: "" },
+  { id: "dragonfly", label: "Dragonfly Capital", group: "vc", type: "vc", size: 13,
+    detail: "Invested in BOTH UMA (2018 seed) AND Polymarket (Series B $45M + $150M round). Dual conflict.",
+    addr: "" },
+  { id: "blockchain_cap", label: "Blockchain Capital", group: "vc", type: "vc", size: 13,
+    detail: "Invested in BOTH UMA (2018 seed) AND Polymarket (led $55M pre-election). Dual conflict.",
+    addr: "" },
+
+  // --- EXTERNAL ---
+  { id: "bitstamp", label: "Bitstamp 2", group: "external", type: "exchange", size: 10,
+    detail: "Institutional exchange. Funded BOTH Hart's wallet AND anonymous '2nd largest voter' in Across DAO.",
+    addr: "" },
+  { id: "tornado", label: "Tornado Cash", group: "external", type: "service", size: 9,
+    detail: "Privacy mixer. Used by meeseeks.eth (deposits Nov 2021, Apr 2022). Creates untraceable governance funding.",
+    addr: "" },
+  { id: "coinbase_prime", label: "Coinbase Prime", group: "external", type: "exchange", size: 10,
+    detail: "Institutional custody. Funded fresh 4.7M UMA storage wallet 81 days before ceasefire dispute.",
+    addr: "" },
+  { id: "eoa_240d", label: "EOA 0x240d", group: "suspected", type: "wallet", size: 10,
+    detail: "141,320 UMA. Safe-funded chain (Safe->0x7ceb->0x240d). Daily multicall + withdrawAndRestake since Mar 26.",
+    addr: "0x240d2243d90e8968d0c8e807202bc8a2de0dc53c" },
+  { id: "fresh1", label: "Fresh Wallet (4.7M)", group: "external", type: "wallet", size: 11,
+    detail: "UNVERIFIED large UMA holder. Not confirmed as connected to Risk Labs.",
+    addr: "0x8d299d62601059a7ece0e3be8a93772d9232fd6b" },
+  { id: "fresh2", label: "Fresh Wallet (2.8M)", group: "external", type: "wallet", size: 10,
+    detail: "UNVERIFIED large UMA holder. Not confirmed as connected to Risk Labs.",
+    addr: "0xc7297a3329581cab4489f6b3f904257d8f368970" },
+
+  // ============================
+  // NEW: ADAPTER CONTRACTS
+  // ============================
+  { id: "adapter_new", label: "OOv2 Adapter (New)", group: "adapter", type: "contract", size: 18,
+    detail: "Newest Polymarket OOv2 adapter. Receives disputes from Polymarket markets and routes them to UMA DVM for resolution. 960 disputes routed through this adapter.",
+    addr: "0x2f5e3684cb1f318ec51b00edba38d79ac2c0aa9d",
+    disputes: 960 },
+  { id: "adapter_mid", label: "OOv2 Adapter (Mid)", group: "adapter", type: "contract", size: 15,
+    detail: "Mid-era Polymarket OOv2 adapter. 723 disputes routed through this adapter.",
+    addr: "0x6a9d222616c90fca5754cd1333cfd9b7fb6a4f74",
+    disputes: 723 },
+  { id: "adapter_old", label: "OOv2 Adapter (Old)", group: "adapter", type: "contract", size: 11,
+    detail: "Older Polymarket OOv2 adapter. 108 disputes. First generation adapter contract.",
+    addr: "0x157ce2d672854c848c9b79c49a8cc6cc89176a49",
+    disputes: 108 },
+
+  // ============================
+  // NEW: SERIAL DISPUTERS (10+ disputes)
+  // ============================
+  { id: "disp_0db5", label: "0x0db5...0493", group: "serial_disputer", type: "wallet", size: 17,
+    detail: "TOP DISPUTER: 160 disputes (won 148, lost 12). 92.5% win rate. ALSO a top proposer with 66 proposals disputed. Dual role: both proposes AND disputes outcomes.",
+    addr: "0x0db5aea9f41ce8398104e9d4694cfb18f146c493",
+    disputes: 160, wins: 148, losses: 12, winRate: "92.5%" },
+  { id: "disp_dcfe", label: "0xdcfe...9eda", group: "serial_disputer", type: "wallet", size: 14,
+    detail: "107 disputes (won 43, lost 64). 40.2% win rate. Notably poor success rate suggests either contrarian strategy or unsophisticated disputing.",
+    addr: "0xdcfe1241639ad73d5d0d992320de6958cc9168da",
+    disputes: 107, wins: 43, losses: 64, winRate: "40.2%" },
+  { id: "disp_b7ad", label: "0xb7ad...4fb4", group: "serial_disputer", type: "wallet", size: 13,
+    detail: "85 disputes (won 80, lost 5). 94.1% win rate. Extremely high accuracy. Likely has information advantage or insider knowledge.",
+    addr: "0xb7ad15ad3457d8b4a3f9c5007bbf27c1f80092bd",
+    disputes: 85, wins: 80, losses: 5, winRate: "94.1%" },
+  { id: "disp_ba2c", label: "0xba2c...f117", group: "serial_disputer", type: "wallet", size: 12,
+    detail: "47 disputes (won 34, lost 13). 72.3% win rate. Also a proposer (19 proposals disputed).",
+    addr: "0xba2cb3168709dc3880243586448d6d67afc2bf17",
+    disputes: 47, wins: 34, losses: 13, winRate: "72.3%" },
+  { id: "disp_d7f6", label: "0xd7f6...4993", group: "serial_disputer", type: "wallet", size: 11,
+    detail: "39 disputes (won 31, lost 8). 79.5% win rate. Also a proposer (20 proposals disputed).",
+    addr: "0xd7f6ebdf0235f587154e2d7d38f9d80568494993",
+    disputes: 39, wins: 31, losses: 8, winRate: "79.5%" },
+  { id: "disp_d23a", label: "0xd23a...e3bb", group: "serial_disputer", type: "wallet", size: 11,
+    detail: "31 disputes (won 31, lost 0). PERFECT 100% win rate. Never lost a dispute. Strong evidence of information advantage.",
+    addr: "0xd23a0860ff460696e1f9438e18033b053a72e3bb",
+    disputes: 31, wins: 31, losses: 0, winRate: "100%" },
+  { id: "disp_bf8b", label: "0xbf8b...7b1d", group: "serial_disputer", type: "wallet", size: 11,
+    detail: "31 disputes (won 27, lost 4). 87.1% win rate.",
+    addr: "0xbf8bd9f30c4e4104172dc0dd29aed76f25757b1d",
+    disputes: 31, wins: 27, losses: 4, winRate: "87.1%" },
+  { id: "disp_9c1f", label: "0x9c1f...0c09", group: "serial_disputer", type: "wallet", size: 10,
+    detail: "30 disputes (won 26, lost 4). 86.7% win rate.",
+    addr: "0x9c1f9b97cd995a9c0cf0ffe20f4d2f5e9c830c09",
+    disputes: 30, wins: 26, losses: 4, winRate: "86.7%" },
+  { id: "disp_cf12", label: "0xcf12...8d02", group: "serial_disputer", type: "wallet", size: 10,
+    detail: "22 disputes (won 22, lost 0). PERFECT 100% win rate. Never lost. Information advantage likely.",
+    addr: "0xcf12f5b99605cb299fb11d5eff4fb304de008d02",
+    disputes: 22, wins: 22, losses: 0, winRate: "100%" },
+  { id: "disp_c1e7", label: "0xc1e7...8973", group: "serial_disputer", type: "wallet", size: 10,
+    detail: "22 disputes (won 22, lost 0). PERFECT 100% win rate. Third wallet with perfect accuracy.",
+    addr: "0xc1e77f9e4d283c710c45a691d4847c879d4c8973",
+    disputes: 22, wins: 22, losses: 0, winRate: "100%" },
+
+  // ============================
+  // NEW: TOP PROPOSERS (whose proposals get disputed)
+  // ============================
+  { id: "prop_5369", label: "0x5369...557c", group: "proposer", type: "wallet", size: 15,
+    detail: "TOP disputed proposer: 90 proposals were disputed. Most-targeted proposer in the ecosystem. Proposals frequently challenged.",
+    addr: "0x53692dbf47fce6fb3d54fded6a4834be981f557c",
+    proposalsDisputed: 90 },
+  { id: "prop_1c2a", label: "0x1c2a...c8c8", group: "proposer", type: "wallet", size: 12,
+    detail: "38 proposals disputed. Third most-disputed proposer.",
+    addr: "0x1c2a6253cdc410a3b0979acb81e3cf318eb4c8c8",
+    proposalsDisputed: 38 },
+  { id: "prop_cfdd", label: "0xcfdd...a9d1", group: "proposer", type: "wallet", size: 11,
+    detail: "32 proposals disputed. Also a disputer (12 disputes filed). Active in both proposing and disputing.",
+    addr: "0xcfdd6663018840621fa812ba6043acb5b1fa29d1",
+    proposalsDisputed: 32 },
+];
+
+const links = [
+  // --- Hart Lambur connections ---
+  { source: "hart", target: "dv2_safe", type: "controls", label: "Signs (2-of-4)" },
+  { source: "hart", target: "moov2_safe", type: "controls", label: "Signs (2-of-4)" },
+  { source: "hart", target: "signer_funded", type: "funds", label: "Funded directly" },
+  { source: "hart", target: "across", type: "controls", label: "CEO" },
+  { source: "hart", target: "uma", type: "controls", label: "Founded" },
+
+  // --- Kevin Chan ---
+  { source: "kevin", target: "maxodds", type: "controls", label: "Is" },
+  { source: "kevin", target: "across", type: "associated", label: "Treasurer" },
+  { source: "kevin", target: "dv2_safe", type: "associated", label: "Treasurer" },
+
+  // --- Allison ---
+  { source: "allison", target: "uma", type: "controls", label: "Co-founded" },
+
+  // --- DV2 Safe -> contracts ---
+  { source: "dv2_safe", target: "dv2_1", type: "controls", label: "Owner" },
+  { source: "dv2_safe", target: "dv2_2", type: "controls", label: "Owner" },
+  { source: "dv2_safe", target: "dv2_3", type: "controls", label: "Owner" },
+  { source: "dv2_safe", target: "dv2_4", type: "controls", label: "Owner" },
+  { source: "dv2_safe", target: "dv2_5", type: "controls", label: "Owner" },
+  { source: "dv2_safe", target: "dv2_6", type: "controls", label: "Owner (81 contracts)" },
+
+  // --- Shared signers ---
+  { source: "signer1", target: "dv2_safe", type: "controls", label: "Signs" },
+  { source: "signer1", target: "moov2_safe", type: "controls", label: "Signs" },
+  { source: "signer_funded", target: "dv2_safe", type: "controls", label: "Signs" },
+  { source: "signer_funded", target: "moov2_safe", type: "controls", label: "Signs" },
+
+  // --- Deployer ---
+  { source: "deployer", target: "dv2_1", type: "funds", label: "Deployed" },
+  { source: "deployer", target: "dv2_2", type: "funds", label: "Deployed" },
+  { source: "deployer", target: "dv2_3", type: "funds", label: "Deployed" },
+  { source: "deployer", target: "governor", type: "funds", label: "Deployed" },
+  { source: "deployer", target: "moov2_safe", type: "associated", label: "#1 on whitelist" },
+
+  // --- Bloc wallet funding ---
+  { source: "dv2_safe", target: "w3", type: "funds", label: "459K UMA" },
+  { source: "dv2_safe", target: "w5", type: "funds", label: "298K UMA" },
+  { source: "dv2_safe", target: "w4", type: "funds", label: "451K UMA" },
+  { source: "dv2_safe", target: "eoa_240d", type: "funds", label: "Via 0x7ceb" },
+  { source: "bitstamp", target: "hart", type: "funds", label: "Funded" },
+  { source: "tornado", target: "meeseeks", type: "funds", label: "Unverified" },
+  { source: "coinbase_prime", target: "fresh1", type: "funds", label: "81 days before" },
+
+  // --- Wallet #4 + Delegate ---
+  { source: "w4", target: "delegate_bot", type: "associated", label: "Delegates to" },
+
+  // --- Suspected vote alignment ---
+  { source: "borntoolate", target: "maxodds", type: "associated", label: "Majority-aligned" },
+  { source: "w3", target: "maxodds", type: "associated", label: "99.4% agreement" },
+  { source: "w5", target: "maxodds", type: "associated", label: "99.6% agreement" },
+  { source: "w4", target: "maxodds", type: "associated", label: "Votes via bot" },
+  { source: "meeseeks", target: "maxodds", type: "associated", label: "Unverified link" },
+
+  // --- VCs -> both protocols ---
+  { source: "coinbase_v", target: "uma", type: "invested", label: "Seed 2018" },
+  { source: "coinbase_v", target: "polymarket", type: "invested", label: "2025" },
+  { source: "dragonfly", target: "uma", type: "invested", label: "Seed 2018" },
+  { source: "dragonfly", target: "polymarket", type: "invested", label: "Series B + $150M" },
+  { source: "blockchain_cap", target: "uma", type: "invested", label: "Seed 2018" },
+  { source: "blockchain_cap", target: "polymarket", type: "invested", label: "Led $55M" },
+
+  // --- Protocol connections ---
+  { source: "uma", target: "polymarket", type: "resolves", label: "Oracle provider" },
+  { source: "across", target: "uma", type: "associated", label: "$23M DAO grants" },
+  { source: "governor", target: "uma", type: "associated", label: "DAO treasury" },
+
+  // --- MOOV2 -> Proposer bot ---
+  { source: "moov2_safe", target: "proposer_bot", type: "controls", label: "Whitelisted" },
+
+  // --- Gas infrastructure ---
+  { source: "dv2_safe", target: "gas_rebate", type: "funds", label: "ETH for gas" },
+  { source: "gas_rebate", target: "dv2_1", type: "funds", label: "Gas rebate" },
+  { source: "gas_rebate", target: "maxodds", type: "funds", label: "Gas rebate" },
+  { source: "gas_rebate", target: "borntoolate", type: "funds", label: "Gas rebate" },
+
+  // --- Fresh wallets ---
+  { source: "fresh1", target: "dv2_safe", type: "associated", label: "Token migration" },
+  { source: "fresh2", target: "dv2_safe", type: "associated", label: "Token migration" },
+
+  // --- Voting wallets -> UMA ---
+  { source: "maxodds", target: "uma", type: "resolves", label: "Votes on DVM" },
+  { source: "borntoolate", target: "uma", type: "resolves", label: "Votes on DVM" },
+  { source: "w3", target: "uma", type: "resolves", label: "Votes on DVM" },
+  { source: "w5", target: "uma", type: "resolves", label: "Votes on DVM" },
+
+  // ============================
+  // NEW: ADAPTER -> UMA (routes disputes)
+  // ============================
+  { source: "adapter_new", target: "uma", type: "resolves", label: "960 disputes -> DVM" },
+  { source: "adapter_mid", target: "uma", type: "resolves", label: "723 disputes -> DVM" },
+  { source: "adapter_old", target: "uma", type: "resolves", label: "108 disputes -> DVM" },
+
+  // Polymarket -> Adapters
+  { source: "polymarket", target: "adapter_new", type: "resolves", label: "Sends disputes" },
+  { source: "polymarket", target: "adapter_mid", type: "resolves", label: "Sends disputes" },
+  { source: "polymarket", target: "adapter_old", type: "resolves", label: "Sends disputes" },
+
+  // ============================
+  // NEW: SERIAL DISPUTERS -> ADAPTERS
+  // ============================
+  { source: "disp_0db5", target: "adapter_new", type: "disputes", label: "160 disputes" },
+  { source: "disp_dcfe", target: "adapter_new", type: "disputes", label: "107 disputes" },
+  { source: "disp_b7ad", target: "adapter_new", type: "disputes", label: "85 disputes" },
+  { source: "disp_ba2c", target: "adapter_new", type: "disputes", label: "47 disputes" },
+  { source: "disp_d7f6", target: "adapter_mid", type: "disputes", label: "39 disputes" },
+  { source: "disp_d23a", target: "adapter_mid", type: "disputes", label: "31 disputes" },
+  { source: "disp_bf8b", target: "adapter_mid", type: "disputes", label: "31 disputes" },
+  { source: "disp_9c1f", target: "adapter_new", type: "disputes", label: "30 disputes" },
+  { source: "disp_cf12", target: "adapter_mid", type: "disputes", label: "22 disputes" },
+  { source: "disp_c1e7", target: "adapter_new", type: "disputes", label: "22 disputes" },
+
+  // ============================
+  // NEW: 0x0db5 is BOTH disputer AND proposer
+  // ============================
+  { source: "disp_0db5", target: "prop_5369", type: "disputes", label: "Disputes proposals" },
+
+  // --- Proposers -> Adapters (their proposals go through adapters) ---
+  { source: "prop_5369", target: "adapter_new", type: "associated", label: "90 proposals disputed" },
+  { source: "prop_1c2a", target: "adapter_new", type: "associated", label: "38 proposals disputed" },
+  { source: "prop_cfdd", target: "adapter_mid", type: "associated", label: "32 proposals disputed" },
+
+  // --- Dual-role: 0x0db5 proposes AND disputes ---
+  { source: "disp_0db5", target: "adapter_mid", type: "associated", label: "66 as proposer" },
+
+  // --- Dual-role proposer-disputers ---
+  { source: "disp_ba2c", target: "adapter_mid", type: "associated", label: "19 as proposer" },
+  { source: "disp_d7f6", target: "adapter_new", type: "associated", label: "20 as proposer" },
+  { source: "prop_cfdd", target: "adapter_new", type: "disputes", label: "12 as disputer" },
+];
+
+// ========== COLOR SCHEMES ==========
+const colors = {
+  insider: "#ff4444",
+  dv2: "#ff8800",
+  suspected: "#ffcc00",
+  infra: "#5588bb",
+  vc: "#aa66ff",
+  protocol: "#44ff88",
+  external: "#888888",
+  serial_disputer: "#ff6b6b",
+  adapter: "#44aaff",
+  proposer: "#ffaa00"
+};
+
+const linkColors = {
+  controls: "#ff4444",
+  funds: "#ffcc00",
+  invested: "#44aaff",
+  associated: "#555555",
+  disputes: "#ff6b6b",
+  resolves: "#44ff88"
+};
+
+const groupLabels = {
+  insider: "Risk Labs Insider",
+  dv2: "DV2 Contract",
+  suspected: "Suspected Insider",
+  infra: "Infrastructure",
+  vc: "VC / Investor",
+  protocol: "Protocol",
+  external: "External",
+  serial_disputer: "Serial Disputer",
+  adapter: "Adapter Contract",
+  proposer: "Top Proposer"
+};
+
+// ========== D3 SETUP ==========
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const svg = d3.select("#graph")
+  .attr("width", width)
+  .attr("height", height);
+
+const g = svg.append("g");
+
+// Zoom
+const zoom = d3.zoom()
+  .scaleExtent([0.15, 5])
+  .on("zoom", (event) => g.attr("transform", event.transform));
+
+svg.call(zoom);
+
+// Arrow markers
+const defs = svg.append("defs");
+
+// Glow filter
+const glowFilter = defs.append("filter").attr("id", "glow");
+glowFilter.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "coloredBlur");
+const feMerge = glowFilter.append("feMerge");
+feMerge.append("feMergeNode").attr("in", "coloredBlur");
+feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+Object.entries(linkColors).forEach(([type, color]) => {
+  defs.append("marker")
+    .attr("id", `arrow-${type}`)
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 20)
+    .attr("refY", 0)
+    .attr("markerWidth", 5)
+    .attr("markerHeight", 5)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-4L10,0L0,4")
+    .attr("fill", color)
+    .attr("opacity", 0.8);
+});
+
+// Force simulation
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+    if (d.type === "controls") return 80;
+    if (d.type === "funds") return 100;
+    if (d.type === "invested") return 160;
+    if (d.type === "disputes") return 120;
+    if (d.type === "resolves") return 110;
+    return 120;
+  }).strength(d => {
+    if (d.type === "controls") return 0.8;
+    if (d.type === "funds") return 0.5;
+    return 0.3;
+  }))
+  .force("charge", d3.forceManyBody().strength(d => {
+    if (d.group === "protocol") return -800;
+    if (d.group === "adapter") return -600;
+    if (d.group === "serial_disputer") return -350;
+    return -400;
+  }))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => (d.size || 12) + 15))
+  .force("x", d3.forceX(d => {
+    // Cluster by group: insiders left, protocols center, disputers right
+    if (d.group === "insider" || d.group === "dv2") return width * 0.3;
+    if (d.group === "protocol" || d.group === "adapter") return width * 0.5;
+    if (d.group === "serial_disputer" || d.group === "proposer") return width * 0.72;
+    if (d.group === "vc") return width * 0.18;
+    if (d.group === "suspected") return width * 0.38;
+    return width * 0.5;
+  }).strength(0.06))
+  .force("y", d3.forceY(d => {
+    if (d.group === "vc") return height * 0.65;
+    if (d.group === "protocol") return height * 0.45;
+    if (d.group === "adapter") return height * 0.55;
+    if (d.group === "serial_disputer") return height * 0.35;
+    if (d.group === "proposer") return height * 0.7;
+    if (d.group === "infra") return height * 0.5;
+    return height * 0.45;
+  }).strength(0.05));
+
+// Links
+const link = g.append("g")
+  .selectAll("line")
+  .data(links)
+  .join("line")
+  .attr("class", "link")
+  .attr("stroke", d => linkColors[d.type] || "#444")
+  .attr("stroke-width", d => {
+    if (d.type === "controls") return 2.5;
+    if (d.type === "disputes") return 2;
+    if (d.type === "resolves") return 1.8;
+    return 1.2;
+  })
+  .attr("stroke-dasharray", d => {
+    if (d.type === "associated") return "4,4";
+    if (d.type === "invested") return "6,3";
+    return "none";
+  })
+  .attr("marker-end", d => `url(#arrow-${d.type})`);
+
+// Link labels
+const linkLabel = g.append("g")
+  .selectAll("text")
+  .data(links)
+  .join("text")
+  .attr("class", "link-label")
+  .text(d => d.label)
+  .attr("opacity", 0);
+
+// Nodes
+const node = g.append("g")
+  .selectAll("g")
+  .data(nodes)
+  .join("g")
+  .attr("class", "node")
+  .call(d3.drag()
+    .on("start", dragstarted)
+    .on("drag", dragged)
+    .on("end", dragended));
+
+// Outer ring (for disputers - proportional to dispute count)
+node.filter(d => d.disputes)
+  .append("circle")
+  .attr("r", d => (d.size || 12) + 4)
+  .attr("fill", "none")
+  .attr("stroke", d => colors[d.group])
+  .attr("stroke-width", 1.5)
+  .attr("stroke-dasharray", "3,2")
+  .attr("opacity", 0.5);
+
+// Main circle
+node.append("circle")
+  .attr("r", d => d.size || 12)
+  .attr("fill", d => colors[d.group] || "#666")
+  .attr("stroke", d => {
+    const c = d3.color(colors[d.group] || "#666");
+    return c ? c.brighter(0.6) : "#888";
+  })
+  .attr("stroke-width", 2)
+  .attr("opacity", 0.9);
+
+// Inner badge for dual-role nodes
+node.filter(d => d.id === "disp_0db5")
+  .append("circle")
+  .attr("r", 5)
+  .attr("fill", "#ffaa00")
+  .attr("stroke", "#000")
+  .attr("stroke-width", 1)
+  .attr("cx", 10)
+  .attr("cy", -10);
+
+// Node labels
+const labels = node.append("text")
+  .attr("dy", d => (d.size || 12) + 14)
+  .text(d => d.label)
+  .attr("fill", d => {
+    const c = d3.color(colors[d.group] || "#888");
+    return c ? c.brighter(0.3) : "#888";
+  })
+  .attr("font-size", d => d.size > 16 ? "10px" : "9px");
+
+// ========== TOOLTIP ==========
+const tooltip = d3.select("#tooltip");
+
+node.on("mouseover", function(event, d) {
+  const groupColor = colors[d.group] || "#888";
+  let detailHtml = d.detail;
+  if (d.disputes !== undefined) {
+    detailHtml += `<div class="tt-stat">Disputes: <span>${d.disputes}</span>`;
+    if (d.wins !== undefined) detailHtml += ` | Won: <span>${d.wins}</span> | Lost: <span>${d.losses}</span> | Win rate: <span>${d.winRate}</span>`;
+    detailHtml += `</div>`;
+  }
+  if (d.proposalsDisputed !== undefined) {
+    detailHtml += `<div class="tt-stat">Proposals disputed: <span>${d.proposalsDisputed}</span></div>`;
+  }
+
+  tooltip.style("opacity", 1)
+    .style("left", Math.min(event.pageX + 15, width - 440) + "px")
+    .style("top", Math.min(event.pageY - 10, height - 200) + "px");
+  tooltip.select(".tt-title").text(d.label);
+  tooltip.select(".tt-group").text(groupLabels[d.group] || d.group).style("color", groupColor);
+  tooltip.select(".tt-addr").text(d.addr || "");
+  tooltip.select(".tt-detail").html(detailHtml);
+
+  // Highlight connections
+  const connectedIds = new Set([d.id]);
+  links.forEach(l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    if (sid === d.id) connectedIds.add(tid);
+    if (tid === d.id) connectedIds.add(sid);
+  });
+
+  link.attr("stroke-opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (sid === d.id || tid === d.id) ? 0.9 : 0.06;
+  }).attr("stroke-width", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    if (sid === d.id || tid === d.id) return 3;
+    return l.type === "controls" ? 2.5 : 1.2;
+  });
+
+  node.select("circle:not([stroke-dasharray])").attr("opacity", n => connectedIds.has(n.id) ? 1 : 0.12);
+  labels.attr("opacity", n => connectedIds.has(n.id) ? 1 : 0.1);
+  linkLabel.attr("opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (sid === d.id || tid === d.id) ? 1 : 0;
+  });
+
+  // Glow the hovered node
+  d3.select(this).select("circle:not([stroke-dasharray])").attr("filter", "url(#glow)");
+})
+.on("mouseout", function() {
+  tooltip.style("opacity", 0);
+  link.attr("stroke-opacity", 0.5)
+    .attr("stroke-width", d => {
+      if (d.type === "controls") return 2.5;
+      if (d.type === "disputes") return 2;
+      if (d.type === "resolves") return 1.8;
+      return 1.2;
+    });
+  node.select("circle:not([stroke-dasharray])").attr("opacity", 0.9).attr("filter", null);
+  labels.attr("opacity", labelsVisible ? 1 : 0);
+  linkLabel.attr("opacity", 0);
+})
+.on("mousemove", function(event) {
+  tooltip.style("left", Math.min(event.pageX + 15, width - 440) + "px")
+    .style("top", Math.min(event.pageY - 10, height - 200) + "px");
+});
+
+// ========== CLICK -> DETAIL PANEL ==========
+node.on("click", function(event, d) {
+  event.stopPropagation();
+  const panel = document.getElementById("detail-panel");
+  const groupColor = colors[d.group] || "#888";
+
+  panel.querySelector(".dp-title").textContent = d.label;
+  panel.querySelector(".dp-group").textContent = groupLabels[d.group] || d.group;
+  panel.querySelector(".dp-group").style.color = groupColor;
+  panel.querySelector(".dp-addr").textContent = d.addr || "";
+
+  let detailText = d.detail;
+  if (d.disputes !== undefined) {
+    detailText += `\n\nDisputes: ${d.disputes}`;
+    if (d.wins !== undefined) detailText += ` | Won: ${d.wins} | Lost: ${d.losses} | Win rate: ${d.winRate}`;
+  }
+  if (d.proposalsDisputed !== undefined) {
+    detailText += `\n\nProposals disputed: ${d.proposalsDisputed}`;
+  }
+  panel.querySelector(".dp-detail").textContent = detailText;
+
+  // Find connections
+  const connLinks = links.filter(l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return sid === d.id || tid === d.id;
+  });
+
+  const linksDiv = panel.querySelector(".dp-links");
+  linksDiv.innerHTML = "";
+  connLinks.forEach(l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    const otherId = sid === d.id ? tid : sid;
+    const otherNode = nodes.find(n => n.id === otherId);
+    const direction = sid === d.id ? "->" : "<-";
+    const div = document.createElement("div");
+    div.className = "dp-link-item";
+    div.innerHTML = `<span>${direction}</span> ${otherNode ? otherNode.label : otherId} <span style="color:${linkColors[l.type] || '#666'}">[${l.label}]</span>`;
+    linksDiv.appendChild(div);
+  });
+
+  panel.style.display = "block";
+});
+
+svg.on("click", () => closeDetail());
+
+function closeDetail() {
+  document.getElementById("detail-panel").style.display = "none";
+}
+
+// ========== DOUBLE-CLICK TO PIN ==========
+node.on("dblclick", function(event, d) {
+  event.stopPropagation();
+  if (d.fx !== null && d.fx !== undefined) {
+    d.fx = null;
+    d.fy = null;
+    d3.select(this).select("circle:not([stroke-dasharray])").attr("stroke-width", 2);
+  } else {
+    d.fx = d.x;
+    d.fy = d.y;
+    d3.select(this).select("circle:not([stroke-dasharray])").attr("stroke-width", 4);
+  }
+  simulation.alpha(0.1).restart();
+});
+
+// ========== TICK ==========
+simulation.on("tick", () => {
+  link
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y);
+
+  linkLabel
+    .attr("x", d => (d.source.x + d.target.x) / 2)
+    .attr("y", d => (d.source.y + d.target.y) / 2);
+
+  node.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+// ========== DRAG ==========
+function dragstarted(event) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  event.subject.fx = event.subject.x;
+  event.subject.fy = event.subject.y;
+}
+function dragged(event) {
+  event.subject.fx = event.x;
+  event.subject.fy = event.y;
+}
+function dragended(event) {
+  if (!event.active) simulation.alphaTarget(0);
+  // Keep pinned if double-clicked, otherwise release
+  if (!event.subject._pinned) {
+    event.subject.fx = null;
+    event.subject.fy = null;
+  }
+}
+
+// ========== CONTROLS ==========
+function resetZoom() {
+  svg.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+}
+
+let labelsVisible = true;
+function toggleLabels() {
+  labelsVisible = !labelsVisible;
+  labels.attr("opacity", labelsVisible ? 1 : 0);
+}
+
+function highlightBloc() {
+  const blocIds = new Set(["maxodds", "borntoolate", "meeseeks", "w3", "w4", "w5", "eoa_240d",
+    "dv2_1", "dv2_2", "dv2_3", "dv2_4", "dv2_5", "dv2_6",
+    "dv2_safe", "kevin", "hart", "delegate_bot", "signer1", "signer_funded"]);
+
+  node.select("circle:not([stroke-dasharray])").attr("opacity", d => blocIds.has(d.id) ? 1 : 0.08);
+  labels.attr("opacity", d => blocIds.has(d.id) ? 1 : 0.08);
+  link.attr("stroke-opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (blocIds.has(sid) && blocIds.has(tid)) ? 0.9 : 0.03;
+  });
+}
+
+function highlightDisputers() {
+  const disputerIds = new Set(nodes.filter(n => n.group === "serial_disputer" || n.group === "adapter").map(n => n.id));
+  disputerIds.add("uma");
+  disputerIds.add("polymarket");
+
+  node.select("circle:not([stroke-dasharray])").attr("opacity", d => disputerIds.has(d.id) ? 1 : 0.08);
+  labels.attr("opacity", d => disputerIds.has(d.id) ? 1 : 0.08);
+  link.attr("stroke-opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (disputerIds.has(sid) || disputerIds.has(tid)) ? 0.9 : 0.03;
+  });
+}
+
+function highlightProposers() {
+  const proposerIds = new Set(nodes.filter(n => n.group === "proposer" || n.group === "adapter").map(n => n.id));
+  proposerIds.add("uma");
+  proposerIds.add("polymarket");
+  proposerIds.add("disp_0db5"); // dual role
+
+  node.select("circle:not([stroke-dasharray])").attr("opacity", d => proposerIds.has(d.id) ? 1 : 0.08);
+  labels.attr("opacity", d => proposerIds.has(d.id) ? 1 : 0.08);
+  link.attr("stroke-opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (proposerIds.has(sid) || proposerIds.has(tid)) ? 0.9 : 0.03;
+  });
+}
+
+function showAll() {
+  node.select("circle:not([stroke-dasharray])").attr("opacity", 0.9);
+  labels.attr("opacity", labelsVisible ? 1 : 0);
+  link.attr("stroke-opacity", 0.5).attr("stroke-width", d => {
+    if (d.type === "controls") return 2.5;
+    if (d.type === "disputes") return 2;
+    if (d.type === "resolves") return 1.8;
+    return 1.2;
+  });
+  // Reset hidden groups
+  hiddenGroups.clear();
+  document.querySelectorAll(".legend-item").forEach(el => el.classList.remove("dimmed"));
+}
+
+let frozen = false;
+function freezeLayout() {
+  frozen = !frozen;
+  if (frozen) {
+    simulation.stop();
+    nodes.forEach(n => { n.fx = n.x; n.fy = n.y; });
+  } else {
+    nodes.forEach(n => { n.fx = null; n.fy = null; });
+    simulation.alpha(0.3).restart();
+  }
+}
+
+// ========== GROUP TOGGLE ==========
+const hiddenGroups = new Set();
+
+function toggleGroup(group) {
+  const legendItem = document.querySelector(`.legend-item[data-group="${group}"]`);
+  if (hiddenGroups.has(group)) {
+    hiddenGroups.delete(group);
+    legendItem && legendItem.classList.remove("dimmed");
+  } else {
+    hiddenGroups.add(group);
+    legendItem && legendItem.classList.add("dimmed");
+  }
+
+  node.attr("display", d => hiddenGroups.has(d.group) ? "none" : null);
+  link.attr("display", l => {
+    const sGroup = typeof l.source === "object" ? l.source.group : nodes.find(n => n.id === l.source)?.group;
+    const tGroup = typeof l.target === "object" ? l.target.group : nodes.find(n => n.id === l.target)?.group;
+    return (hiddenGroups.has(sGroup) || hiddenGroups.has(tGroup)) ? "none" : null;
+  });
+  linkLabel.attr("display", l => {
+    const sGroup = typeof l.source === "object" ? l.source.group : nodes.find(n => n.id === l.source)?.group;
+    const tGroup = typeof l.target === "object" ? l.target.group : nodes.find(n => n.id === l.target)?.group;
+    return (hiddenGroups.has(sGroup) || hiddenGroups.has(tGroup)) ? "none" : null;
+  });
+}
+
+// ========== SEARCH ==========
+const searchInput = document.getElementById("search-input");
+const searchResults = document.getElementById("search-results");
+
+searchInput.addEventListener("input", function() {
+  const q = this.value.toLowerCase().trim();
+  if (q.length < 2) {
+    searchResults.style.display = "none";
+    return;
+  }
+  const matches = nodes.filter(n =>
+    n.label.toLowerCase().includes(q) ||
+    (n.addr && n.addr.toLowerCase().includes(q)) ||
+    (n.detail && n.detail.toLowerCase().includes(q))
+  ).slice(0, 8);
+
+  if (matches.length === 0) {
+    searchResults.style.display = "none";
+    return;
+  }
+
+  searchResults.innerHTML = "";
+  matches.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "search-result-item";
+    div.innerHTML = `<span class="sr-label">${m.label}</span><span class="sr-group" style="color:${colors[m.group]}">${groupLabels[m.group] || m.group}</span>`;
+    div.addEventListener("click", () => focusNode(m));
+    searchResults.appendChild(div);
+  });
+  searchResults.style.display = "block";
+});
+
+searchInput.addEventListener("blur", () => {
+  setTimeout(() => { searchResults.style.display = "none"; }, 200);
+});
+
+function focusNode(d) {
+  searchResults.style.display = "none";
+  searchInput.value = d.label;
+
+  // Pan to node
+  const scale = 1.5;
+  const tx = width / 2 - d.x * scale;
+  const ty = height / 2 - d.y * scale;
+  svg.transition().duration(750).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(tx, ty).scale(scale)
+  );
+
+  // Pulse effect
+  const nodeEl = node.filter(n => n.id === d.id);
+  nodeEl.select("circle:not([stroke-dasharray])")
+    .transition().duration(200).attr("r", (d.size || 12) * 1.8)
+    .transition().duration(200).attr("r", (d.size || 12) * 1.4)
+    .transition().duration(200).attr("r", (d.size || 12) * 1.6)
+    .transition().duration(300).attr("r", d.size || 12);
+
+  // Simulate hover highlight
+  const connectedIds = new Set([d.id]);
+  links.forEach(l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    if (sid === d.id) connectedIds.add(tid);
+    if (tid === d.id) connectedIds.add(sid);
+  });
+  node.select("circle:not([stroke-dasharray])").attr("opacity", n => connectedIds.has(n.id) ? 1 : 0.15);
+  labels.attr("opacity", n => connectedIds.has(n.id) ? 1 : 0.1);
+  link.attr("stroke-opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (sid === d.id || tid === d.id) ? 0.9 : 0.05;
+  });
+  linkLabel.attr("opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (sid === d.id || tid === d.id) ? 1 : 0;
+  });
+
+  // Reset after 4s
+  setTimeout(() => {
+    node.select("circle:not([stroke-dasharray])").attr("opacity", 0.9);
+    labels.attr("opacity", labelsVisible ? 1 : 0);
+    link.attr("stroke-opacity", 0.5);
+    linkLabel.attr("opacity", 0);
+  }, 4000);
+}
+
+// ========== INITIAL ZOOM TO FIT ==========
+setTimeout(() => {
+  const bounds = g.node().getBBox();
+  if (bounds.width === 0 || bounds.height === 0) return;
+  const fullWidth = bounds.width;
+  const fullHeight = bounds.height;
+  const midX = bounds.x + fullWidth / 2;
+  const midY = bounds.y + fullHeight / 2;
+  const scale = 0.82 / Math.max(fullWidth / width, fullHeight / height);
+  const translate = [width / 2 - scale * midX, height / 2 - scale * midY];
+
+  svg.transition().duration(1200).call(
+    zoom.transform,
+    d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
+  );
+}, 2500);
+
+// ========== KEYBOARD SHORTCUTS ==========
+document.addEventListener("keydown", (e) => {
+  if (e.target === searchInput) return;
+  if (e.key === "r" || e.key === "R") resetZoom();
+  if (e.key === "l" || e.key === "L") toggleLabels();
+  if (e.key === "b" || e.key === "B") highlightBloc();
+  if (e.key === "d" || e.key === "D") highlightDisputers();
+  if (e.key === "p" || e.key === "P") highlightProposers();
+  if (e.key === "a" || e.key === "A") showAll();
+  if (e.key === "f" || e.key === "F") freezeLayout();
+  if (e.key === "Escape") { showAll(); closeDetail(); }
+  if (e.key === "/") { e.preventDefault(); searchInput.focus(); }
+});
+</script>
+</body>
+</html>

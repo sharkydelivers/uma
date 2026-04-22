@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polymarket Oracle Disputes - Complete On-Chain Record</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1a2235;
+  --bg-card: #151d2e;
+  --bg-hover: #1e293b;
+  --border: #1e3a5f;
+  --border-dim: #162340;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-dim: #64748b;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-amber: #f59e0b;
+  --accent-purple: #8b5cf6;
+  --accent-pink: #ec4899;
+  --serial-highlight: #f59e0b;
+  --won-bg: rgba(16, 185, 129, 0.08);
+  --lost-bg: rgba(239, 68, 68, 0.06);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.page-header {
+  background: linear-gradient(180deg, #0f172a 0%, var(--bg-primary) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 40px 32px 32px;
+  text-align: center;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.page-header .subtitle {
+  font-size: 14px;
+  color: var(--text-dim);
+  font-weight: 400;
+  letter-spacing: 0.5px;
+}
+
+.page-header .subtitle span {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
+.classification-badge {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 14px;
+  border: 1px solid var(--accent-amber);
+  color: var(--accent-amber);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  border-radius: 3px;
+}
+
+.container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+/* Stats Dashboard */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+}
+
+.stat-card.blue::before { background: var(--accent-blue); }
+.stat-card.cyan::before { background: var(--accent-cyan); }
+.stat-card.green::before { background: var(--accent-green); }
+.stat-card.purple::before { background: var(--accent-purple); }
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+/* Year breakdown bar */
+.year-bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.year-bar .year-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.year-bar .year-chip strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Panel sections */
+.panels-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-dim);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-header .icon {
+  font-size: 14px;
+}
+
+.panel-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.panel-table th {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 8px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.panel-table th:last-child {
+  text-align: right;
+}
+
+.panel-table td {
+  font-size: 12px;
+  padding: 7px 16px;
+  border-bottom: 1px solid rgba(30, 58, 95, 0.3);
+  color: var(--text-secondary);
+}
+
+.panel-table td:last-child {
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+}
+
+.panel-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+.panel-table .rank {
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.panel-table .address-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-cyan);
+  text-decoration: none;
+}
+
+.panel-table .address-link:hover {
+  text-decoration: underline;
+}
+
+.panel-table .serial-tag {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-amber);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+}
+
+.win-rate {
+  display: inline-block;
+  min-width: 44px;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.win-rate.high { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.win-rate.mid { background: rgba(245,158,11,0.15); color: var(--accent-amber); }
+.win-rate.low { background: rgba(239,68,68,0.12); color: var(--accent-red); }
+
+/* Controls */
+.controls {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 280px;
+  position: relative;
+}
+
+.search-box input {
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dim);
+  border-radius: 6px;
+  padding: 10px 14px 10px 38px;
+  font-size: 13px;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-box input:focus {
+  border-color: var(--accent-blue);
+}
+
+.search-box input::placeholder {
+  color: var(--text-dim);
+}
+
+.search-box .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dim);
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-secondary);
+}
+
+.filter-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.result-filter-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.result-filter-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dim);
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-dim);
+}
+
+.result-filter-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--text-secondary);
+}
+
+.result-filter-btn.active {
+  border-color: var(--accent-blue);
+  color: #fff;
+  background: var(--accent-blue);
+}
+
+.result-count {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+
+/* Main Table */
+.table-wrapper {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.main-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.main-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.main-table th {
+  background: var(--bg-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.main-table th:hover {
+  color: var(--text-secondary);
+}
+
+.main-table th.sorted-asc::after { content: ' \u25B2'; font-size: 8px; }
+.main-table th.sorted-desc::after { content: ' \u25BC'; font-size: 8px; }
+
+/* Column widths */
+.main-table .col-num { width: 50px; }
+.main-table .col-date { width: 100px; }
+.main-table .col-question { width: auto; }
+.main-table .col-proposer { width: 130px; }
+.main-table .col-proposed { width: 70px; }
+.main-table .col-disputer { width: 130px; }
+.main-table .col-settled { width: 70px; }
+.main-table .col-result { width: 70px; }
+.main-table .col-bond { width: 80px; }
+.main-table .col-tx { width: 90px; }
+
+.main-table td {
+  font-size: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(30, 58, 95, 0.25);
+  color: var(--text-secondary);
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main-table tbody tr {
+  transition: background-color 0.1s;
+}
+
+.main-table tbody tr:hover {
+  background: var(--bg-hover);
+}
+
+.main-table tbody tr.row-won {
+  background: var(--won-bg);
+}
+
+.main-table tbody tr.row-lost {
+  background: var(--lost-bg);
+}
+
+.main-table tbody tr.row-won:hover {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.main-table tbody tr.row-lost:hover {
+  background: rgba(239, 68, 68, 0.10);
+}
+
+.row-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.date-cell {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.question-cell {
+  position: relative;
+}
+
+.question-text {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.question-text:hover {
+  white-space: normal;
+  overflow: visible;
+  position: relative;
+  z-index: 5;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+.addr-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--accent-cyan);
+  text-decoration: none;
+}
+
+.addr-link:hover {
+  text-decoration: underline;
+}
+
+.addr-link.serial-disputer {
+  color: var(--accent-amber);
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  text-align: center;
+  min-width: 38px;
+}
+
+.badge-yes { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+.badge-no { background: rgba(239,68,68,0.12); color: var(--accent-red); }
+.badge-other { background: rgba(100,116,139,0.15); color: var(--text-dim); }
+
+.badge-won { background: rgba(16,185,129,0.18); color: var(--accent-green); font-weight: 700; }
+.badge-lost { background: rgba(239,68,68,0.15); color: var(--accent-red); font-weight: 700; }
+.badge-pending { background: rgba(100,116,139,0.15); color: var(--text-dim); }
+
+.bond-cell {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.tx-link {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--accent-purple);
+  text-decoration: none;
+}
+
+.tx-link:hover {
+  text-decoration: underline;
+}
+
+/* Scrollable table body */
+.table-scroll {
+  max-height: 75vh;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-scroll::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.table-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-blue);
+}
+
+/* Footer */
+.page-footer {
+  text-align: center;
+  padding: 32px;
+  border-top: 1px solid var(--border-dim);
+  margin-top: 24px;
+}
+
+.page-footer .source-info {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.8;
+}
+
+.page-footer .source-info a {
+  color: var(--accent-cyan);
+  text-decoration: none;
+}
+
+.page-footer .source-info a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .panels-row { grid-template-columns: 1fr; }
+  .container { padding: 16px; }
+}
+
+@media (max-width: 768px) {
+  .stats-grid { grid-template-columns: 1fr; }
+  .controls { flex-direction: column; }
+  .search-box { min-width: 100%; }
+  .filter-buttons { flex-wrap: wrap; }
+}
+
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Polymarket Oracle Disputes &mdash; Complete On-Chain Record</h1>
+  <div class="subtitle"><span>1,800</span> disputes from Polygon OptimisticOracle V2 (2022&ndash;2026)</div>
+  <div class="classification-badge">On-Chain Evidence &middot; Subgraph Data</div>
+</div>
+
+<div class="container">
+  <!-- Stats Dashboard -->
+  <div class="stats-grid" id="stats-grid"></div>
+
+  <!-- Top Disputers & Proposers -->
+  <div class="panels-row">
+    <div class="panel">
+      <div class="panel-header"><span class="icon">&#9888;</span> Top 10 Disputers (by volume) &mdash; with win rate</div>
+      <table class="panel-table">
+        <thead><tr><th style="width:30px">#</th><th>Address</th><th>Disputes</th><th style="text-align:right">Win Rate</th></tr></thead>
+        <tbody id="top-disputers"></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="icon">&#128269;</span> Top 5 Most-Disputed Proposers</div>
+      <table class="panel-table">
+        <thead><tr><th style="width:30px">#</th><th>Address</th><th style="text-align:right">Times Disputed</th></tr></thead>
+        <tbody id="top-proposers"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="search-box">
+      <span class="search-icon">&#128270;</span>
+      <input type="text" id="search-input" placeholder="Search by market question, address, or tx hash...">
+    </div>
+    <div class="filter-buttons" id="year-filters"></div>
+    <div class="result-filter-buttons">
+      <button class="result-filter-btn active" data-result="all">All</button>
+      <button class="result-filter-btn" data-result="WON">Won</button>
+      <button class="result-filter-btn" data-result="LOST">Lost</button>
+      <button class="result-filter-btn" data-result="PENDING">Pending</button>
+    </div>
+    <div class="result-count" id="result-count"></div>
+  </div>
+
+  <!-- Main Table -->
+  <div class="table-wrapper">
+    <div class="table-scroll">
+      <table class="main-table">
+        <thead>
+          <tr>
+            <th class="col-num" data-col="num">#</th>
+            <th class="col-date" data-col="date" data-sort="asc">Date &#9650;</th>
+            <th class="col-question" data-col="question">Market Question</th>
+            <th class="col-proposer" data-col="proposer">Proposer</th>
+            <th class="col-proposed" data-col="proposed">Proposed</th>
+            <th class="col-disputer" data-col="disputer">Disputer</th>
+            <th class="col-settled" data-col="settled">Settled</th>
+            <th class="col-result" data-col="result">Result</th>
+            <th class="col-bond" data-col="bond" style="text-align:right">Bond ($)</th>
+            <th class="col-tx" data-col="tx">Dispute TX</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="page-footer">
+  <div class="source-info">
+    Generated: <span id="gen-timestamp"></span><br>
+    Data source: <a href="https://thegraph.com/hosted-service/subgraph/umaprotocol/polygon-optimistic-oracle-v2" target="_blank">TheGraph &mdash; Polygon OptimisticOracle V2 Subgraph</a><br>
+    Chain: Polygon (PoS) &middot; All addresses linked to <a href="https://polygonscan.com" target="_blank">Polygonscan</a><br>
+    <br>
+    This page is a self-contained evidence artifact. No external data fetched at runtime.
+  </div>
+</div>
+
+<script>
+// ===== DATA LOADING =====
+// We load the JSON data via fetch from the sibling path
+let DATA = null;
+
+async function loadData() {
+  try {
+    const resp = await fetch('./cross-ref-results/all-oo-v2-disputes.json');
+    DATA = await resp.json();
+  } catch(e) {
+    // Fallback: try relative path variations
+    try {
+      const resp2 = await fetch('cross-ref-results/all-oo-v2-disputes.json');
+      DATA = await resp2.json();
+    } catch(e2) {
+      document.getElementById('table-body').innerHTML =
+        '<tr><td colspan="10" style="text-align:center;padding:40px;color:#ef4444;">Failed to load dispute data. Ensure all-oo-v2-disputes.json is accessible.</td></tr>';
+      return;
+    }
+  }
+  initPage();
+}
+
+function shortAddr(addr) {
+  if (!addr) return '???';
+  return addr.slice(0,6) + '...' + addr.slice(-4);
+}
+
+function polygonscanAddr(addr) {
+  return 'https://polygonscan.com/address/' + addr;
+}
+
+function polygonscanTx(hash) {
+  return 'https://polygonscan.com/tx/' + hash;
+}
+
+function cleanQuestion(q) {
+  if (!q) return '(no question data)';
+  // Strip common prefixes
+  let clean = q.replace(/^q:\s*title:\s*/i, '').replace(/^q:\s*/i, '').trim();
+  if (!clean) return '(empty)';
+  return clean;
+}
+
+function formatBond(val) {
+  if (val === null || val === undefined) return '-';
+  if (val >= 1000) return '$' + val.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+  return '$' + val.toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 2});
+}
+
+function formatDate(d) {
+  if (!d) return '-';
+  // "2026-04-09 17:02" -> "2026-04-09"
+  return d.split(' ')[0];
+}
+
+// ===== INIT =====
+function initPage() {
+  const disputes = DATA.all_disputes;
+  const byYear = DATA.by_year;
+  const disputerCounts = DATA.disputer_counts;
+  const proposerCounts = DATA.proposer_counts;
+
+  // Identify serial disputers (10+)
+  const serialDisputers = new Set();
+  for (const [addr, count] of Object.entries(disputerCounts)) {
+    if (count >= 10) serialDisputers.add(addr.toLowerCase());
+  }
+
+  // Compute win rates for disputers
+  const disputerWins = {};
+  const disputerTotal = {};
+  for (const d of disputes) {
+    const addr = d.disputer ? d.disputer.toLowerCase() : '';
+    if (!addr) continue;
+    disputerTotal[addr] = (disputerTotal[addr] || 0) + 1;
+    if (d.disputer_won === 'WON') {
+      disputerWins[addr] = (disputerWins[addr] || 0) + 1;
+    }
+  }
+
+  // Stats cards
+  const totalDisputes = disputes.length;
+  const totalWon = disputes.filter(d => d.disputer_won === 'WON').length;
+  const totalLost = disputes.filter(d => d.disputer_won === 'LOST').length;
+  const totalPending = totalDisputes - totalWon - totalLost;
+  const totalBond = disputes.reduce((s, d) => s + (d.bond_usdc || 0), 0);
+
+  const statsGrid = document.getElementById('stats-grid');
+  statsGrid.innerHTML = `
+    <div class="stat-card blue">
+      <div class="stat-label">Total Disputes</div>
+      <div class="stat-value">${totalDisputes.toLocaleString()}</div>
+      <div class="stat-detail">${Object.keys(disputerCounts).length} unique disputers &middot; ${Object.keys(proposerCounts).length} unique proposers</div>
+    </div>
+    <div class="stat-card cyan">
+      <div class="stat-label">By Year</div>
+      <div class="stat-value year-bar">
+        ${Object.entries(byYear).sort((a,b) => parseInt(a[0]) - parseInt(b[0])).map(([y,c]) =>
+          `<span class="year-chip"><strong>${y}</strong>: ${c}</span>`
+        ).join('')}
+      </div>
+      <div class="stat-detail">Disputes accelerating year over year</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Outcomes</div>
+      <div class="stat-value" style="font-size:24px; color: var(--accent-green);">${totalWon} <span style="color:var(--text-dim);font-size:14px;">WON</span> &nbsp; <span style="color:var(--accent-red);">${totalLost}</span> <span style="color:var(--text-dim);font-size:14px;">LOST</span></div>
+      <div class="stat-detail">${totalPending > 0 ? totalPending + ' pending/unresolved' : 'All settled'} &middot; Disputer win rate: ${totalWon > 0 ? ((totalWon / (totalWon + totalLost)) * 100).toFixed(1) : 0}%</div>
+    </div>
+    <div class="stat-card purple">
+      <div class="stat-label">Total Bonds at Stake</div>
+      <div class="stat-value">${formatBond(totalBond)}</div>
+      <div class="stat-detail">${serialDisputers.size} serial disputers (10+ disputes)</div>
+    </div>
+  `;
+
+  // Top 10 disputers
+  const topDisputers = Object.entries(disputerCounts)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const topDisputersTbody = document.getElementById('top-disputers');
+  topDisputersTbody.innerHTML = topDisputers.map(([addr, count], i) => {
+    const wins = disputerWins[addr.toLowerCase()] || 0;
+    const total = disputerTotal[addr.toLowerCase()] || count;
+    const wr = total > 0 ? ((wins / total) * 100).toFixed(1) : '0.0';
+    const wrClass = parseFloat(wr) >= 60 ? 'high' : parseFloat(wr) >= 40 ? 'mid' : 'low';
+    const serialTag = count >= 10 ? '<span class="serial-tag">SERIAL</span>' : '';
+    return `<tr>
+      <td class="rank">${i+1}</td>
+      <td><a class="address-link" href="${polygonscanAddr(addr)}" target="_blank">${shortAddr(addr)}</a>${serialTag}</td>
+      <td>${count}</td>
+      <td style="text-align:right"><span class="win-rate ${wrClass}">${wr}%</span></td>
+    </tr>`;
+  }).join('');
+
+  // Top 5 proposers
+  const topProposers = Object.entries(proposerCounts)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const topProposersTbody = document.getElementById('top-proposers');
+  topProposersTbody.innerHTML = topProposers.map(([addr, count], i) => {
+    return `<tr>
+      <td class="rank">${i+1}</td>
+      <td><a class="address-link" href="${polygonscanAddr(addr)}" target="_blank">${shortAddr(addr)}</a></td>
+      <td style="text-align:right">${count}</td>
+    </tr>`;
+  }).join('');
+
+  // Year filter buttons
+  const years = ['All', ...Object.keys(byYear).sort()];
+  const yearFilters = document.getElementById('year-filters');
+  yearFilters.innerHTML = years.map(y =>
+    `<button class="filter-btn ${y === 'All' ? 'active' : ''}" data-year="${y}">${y}</button>`
+  ).join('');
+
+  // Gen timestamp
+  document.getElementById('gen-timestamp').textContent = DATA.generated || new Date().toISOString().slice(0,16) + ' UTC';
+
+  // Render table
+  let currentSort = { col: 'date', dir: 'desc' };
+  let currentYear = 'All';
+  let currentResult = 'all';
+  let searchQuery = '';
+
+  function getFilteredData() {
+    let filtered = [...disputes];
+
+    // Year filter
+    if (currentYear !== 'All') {
+      filtered = filtered.filter(d => String(d.year) === currentYear);
+    }
+
+    // Result filter
+    if (currentResult !== 'all') {
+      if (currentResult === 'PENDING') {
+        filtered = filtered.filter(d => d.disputer_won !== 'WON' && d.disputer_won !== 'LOST');
+      } else {
+        filtered = filtered.filter(d => d.disputer_won === currentResult);
+      }
+    }
+
+    // Search
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(d => {
+        return (d.question && d.question.toLowerCase().includes(q)) ||
+               (d.proposer && d.proposer.toLowerCase().includes(q)) ||
+               (d.disputer && d.disputer.toLowerCase().includes(q)) ||
+               (d.dispute_hash && d.dispute_hash.toLowerCase().includes(q));
+      });
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let va, vb;
+      switch(currentSort.col) {
+        case 'date':
+          va = a.dispute_date || a.date || '';
+          vb = b.dispute_date || b.date || '';
+          break;
+        case 'question':
+          va = cleanQuestion(a.question).toLowerCase();
+          vb = cleanQuestion(b.question).toLowerCase();
+          break;
+        case 'proposer':
+          va = a.proposer || '';
+          vb = b.proposer || '';
+          break;
+        case 'disputer':
+          va = a.disputer || '';
+          vb = b.disputer || '';
+          break;
+        case 'proposed':
+          va = a.proposed || '';
+          vb = b.proposed || '';
+          break;
+        case 'settled':
+          va = a.settled || '';
+          vb = b.settled || '';
+          break;
+        case 'result':
+          va = a.disputer_won || '';
+          vb = b.disputer_won || '';
+          break;
+        case 'bond':
+          va = a.bond_usdc || 0;
+          vb = b.bond_usdc || 0;
+          break;
+        default:
+          va = a.dispute_date || a.date || '';
+          vb = b.dispute_date || b.date || '';
+      }
+      if (typeof va === 'number') {
+        return currentSort.dir === 'asc' ? va - vb : vb - va;
+      }
+      return currentSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    });
+
+    return filtered;
+  }
+
+  function renderTable() {
+    const filtered = getFilteredData();
+    const tbody = document.getElementById('table-body');
+
+    document.getElementById('result-count').textContent = `${filtered.length.toLocaleString()} of ${totalDisputes.toLocaleString()} disputes`;
+
+    // Render in chunks for performance
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 0; i < filtered.length; i++) {
+      const d = filtered[i];
+      const tr = document.createElement('tr');
+
+      const won = d.disputer_won === 'WON';
+      const lost = d.disputer_won === 'LOST';
+      if (won) tr.className = 'row-won';
+      else if (lost) tr.className = 'row-lost';
+
+      const isSerial = d.disputer && serialDisputers.has(d.disputer.toLowerCase());
+      const question = cleanQuestion(d.question);
+      const proposedBadge = d.proposed === 'YES' ? 'badge-yes' :
+                            d.proposed === 'NO' ? 'badge-no' : 'badge-other';
+      const settledBadge = d.settled === 'YES' ? 'badge-yes' :
+                           d.settled === 'NO' ? 'badge-no' : 'badge-other';
+      const resultBadge = won ? 'badge-won' : lost ? 'badge-lost' : 'badge-pending';
+      const resultText = won ? 'WON' : lost ? 'LOST' : (d.disputer_won || d.state || '?');
+
+      tr.innerHTML = `
+        <td class="row-num">${i + 1}</td>
+        <td class="date-cell">${formatDate(d.dispute_date || d.date)}</td>
+        <td class="question-cell"><span class="question-text" title="${question.replace(/"/g, '&quot;')}">${escapeHtml(question)}</span></td>
+        <td><a class="addr-link" href="${polygonscanAddr(d.proposer)}" target="_blank">${shortAddr(d.proposer)}</a></td>
+        <td><span class="badge ${proposedBadge}">${d.proposed || '?'}</span></td>
+        <td><a class="addr-link${isSerial ? ' serial-disputer' : ''}" href="${polygonscanAddr(d.disputer)}" target="_blank">${shortAddr(d.disputer)}</a>${isSerial ? ' <span style="color:var(--accent-amber);font-size:9px;" title="Serial disputer (10+ disputes)">&#9733;</span>' : ''}</td>
+        <td><span class="badge ${settledBadge}">${d.settled || '?'}</span></td>
+        <td><span class="badge ${resultBadge}">${resultText}</span></td>
+        <td class="bond-cell">${formatBond(d.bond_usdc)}</td>
+        <td>${d.dispute_hash ? `<a class="tx-link" href="${polygonscanTx(d.dispute_hash)}" target="_blank">${d.dispute_hash.slice(0,10)}...</a>` : '-'}</td>
+      `;
+
+      fragment.appendChild(tr);
+    }
+
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
+
+    // Update sort indicators
+    document.querySelectorAll('.main-table th').forEach(th => {
+      th.classList.remove('sorted-asc', 'sorted-desc');
+      if (th.dataset.col === currentSort.col) {
+        th.classList.add(currentSort.dir === 'asc' ? 'sorted-asc' : 'sorted-desc');
+      }
+    });
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Event: Year filter
+  yearFilters.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('filter-btn')) return;
+    yearFilters.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    currentYear = e.target.dataset.year;
+    renderTable();
+  });
+
+  // Event: Result filter
+  document.querySelectorAll('.result-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.result-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentResult = btn.dataset.result;
+      renderTable();
+    });
+  });
+
+  // Event: Search
+  let searchTimeout;
+  document.getElementById('search-input').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      searchQuery = e.target.value.trim();
+      renderTable();
+    }, 200);
+  });
+
+  // Event: Column sort
+  document.querySelectorAll('.main-table th[data-col]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (col === 'num' || col === 'tx') return;
+      if (currentSort.col === col) {
+        currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort = { col, dir: 'desc' };
+      }
+      renderTable();
+    });
+  });
+
+  // Initial render (newest first)
+  currentSort = { col: 'date', dir: 'desc' };
+  renderTable();
+}
+
+// ===== START =====
+loadData();
+</script>
+
+</body>
+</html>
