@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UMA / Polymarket Investigation — Interactive Connection Map</title>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #0a0e17;
+  color: #c8cdd5;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ===== GRAPH CANVAS ===== */
+#graph-container {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+#graph-container svg { width: 100%; height: 100%; }
+
+/* ===== HEADER BAR ===== */
+#header {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 52px;
+  background: linear-gradient(180deg, rgba(10,14,23,0.97) 0%, rgba(10,14,23,0.85) 100%);
+  border-bottom: 1px solid #1e2740;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  z-index: 100;
+  gap: 16px;
+}
+#header h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e8ecf2;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+}
+#header .subtitle {
+  font-size: 11px;
+  color: #5a6580;
+  white-space: nowrap;
+}
+#header .spacer { flex: 1; }
+
+/* ===== SEARCH ===== */
+#search-box {
+  position: relative;
+}
+#search-box input {
+  background: #111827;
+  border: 1px solid #253050;
+  border-radius: 6px;
+  color: #c8cdd5;
+  padding: 6px 12px 6px 32px;
+  font-size: 12px;
+  width: 240px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+#search-box input:focus { border-color: #4a8cff; }
+#search-box input::placeholder { color: #3a4a6a; }
+#search-box .search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  color: #3a4a6a;
+  pointer-events: none;
+}
+#search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #111827;
+  border: 1px solid #253050;
+  border-radius: 0 0 6px 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  display: none;
+  z-index: 200;
+}
+#search-results .sr-item {
+  padding: 8px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  border-bottom: 1px solid #1a2238;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#search-results .sr-item:hover { background: #1a2540; }
+#search-results .sr-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+#search-results .sr-label { color: #e0e4ec; }
+#search-results .sr-type { color: #5a6580; font-size: 10px; margin-left: auto; }
+
+/* ===== FILTER PANEL (left) ===== */
+#filter-panel {
+  position: absolute;
+  top: 64px;
+  left: 12px;
+  background: rgba(12,16,28,0.95);
+  border: 1px solid #1e2740;
+  border-radius: 10px;
+  padding: 14px 16px;
+  z-index: 90;
+  width: 200px;
+  backdrop-filter: blur(12px);
+}
+#filter-panel h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #5a6580;
+  margin-bottom: 10px;
+}
+.filter-group { margin-bottom: 14px; }
+.filter-group:last-child { margin-bottom: 0; }
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+.filter-item input[type="checkbox"] { display: none; }
+.filter-check {
+  width: 16px; height: 16px;
+  border: 2px solid #3a4a6a;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.filter-item input:checked + .filter-check {
+  border-color: #4a8cff;
+  background: #4a8cff;
+}
+.filter-item input:checked + .filter-check::after {
+  content: "";
+  width: 6px; height: 3px;
+  border-left: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: rotate(-45deg) translateY(-1px);
+}
+.filter-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.filter-label { color: #c0c8d8; }
+.filter-count { margin-left: auto; color: #4a5a7a; font-size: 10px; }
+
+/* ===== LEGEND ===== */
+#legend-panel {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(12,16,28,0.95);
+  border: 1px solid #1e2740;
+  border-radius: 10px;
+  padding: 14px 16px;
+  z-index: 90;
+  width: 200px;
+  backdrop-filter: blur(12px);
+}
+#legend-panel h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #5a6580;
+  margin-bottom: 10px;
+}
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 11px;
+  color: #8a94aa;
+}
+.legend-line {
+  width: 22px;
+  height: 0;
+  flex-shrink: 0;
+}
+.legend-line-solid { border-top: 2px solid; }
+.legend-line-dash { border-top: 2px dashed; }
+.legend-sep {
+  border-top: 1px solid #1e2740;
+  margin: 8px 0;
+}
+
+/* ===== INFO PANEL (right) ===== */
+#info-panel {
+  position: absolute;
+  top: 64px;
+  right: 12px;
+  width: 320px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background: rgba(12,16,28,0.95);
+  border: 1px solid #1e2740;
+  border-radius: 10px;
+  padding: 0;
+  z-index: 90;
+  backdrop-filter: blur(12px);
+  display: none;
+}
+#info-panel.visible { display: block; }
+
+#info-panel .ip-header {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid #1e2740;
+}
+#info-panel .ip-close {
+  float: right;
+  background: none;
+  border: none;
+  color: #5a6580;
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+#info-panel .ip-close:hover { color: #ff5555; }
+#info-panel .ip-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+#info-panel .ip-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e8ecf2;
+  margin-bottom: 4px;
+}
+#info-panel .ip-addr {
+  font-size: 11px;
+  color: #4a8cff;
+  word-break: break-all;
+  line-height: 1.5;
+}
+#info-panel .ip-addr a {
+  color: #4a8cff;
+  text-decoration: none;
+}
+#info-panel .ip-addr a:hover { text-decoration: underline; }
+
+#info-panel .ip-section {
+  padding: 12px 18px;
+  border-bottom: 1px solid #1a2238;
+}
+#info-panel .ip-section:last-child { border-bottom: none; }
+#info-panel .ip-section h4 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #5a6580;
+  margin-bottom: 8px;
+}
+#info-panel .ip-detail {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #a0a8bc;
+}
+#info-panel .ip-uma-amount {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ff6b6b;
+  margin-bottom: 2px;
+}
+#info-panel .ip-uma-label {
+  font-size: 10px;
+  color: #5a6580;
+}
+
+#info-panel .ip-conn-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #131a2e;
+  font-size: 11px;
+  cursor: pointer;
+}
+#info-panel .ip-conn-item:last-child { border-bottom: none; }
+#info-panel .ip-conn-item:hover { color: #fff; }
+#info-panel .ip-conn-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+#info-panel .ip-conn-name { color: #c0c8d8; }
+#info-panel .ip-conn-rel {
+  margin-left: auto;
+  color: #4a5a7a;
+  font-size: 10px;
+  text-align: right;
+  max-width: 120px;
+}
+
+/* ===== STATS BAR (bottom) ===== */
+#stats-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(12,16,28,0.95);
+  border: 1px solid #1e2740;
+  border-radius: 10px;
+  padding: 10px 20px;
+  display: flex;
+  gap: 24px;
+  z-index: 90;
+  backdrop-filter: blur(12px);
+  white-space: nowrap;
+}
+.stat-item {
+  text-align: center;
+}
+.stat-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ff6b6b;
+}
+.stat-label {
+  font-size: 9px;
+  color: #4a5a7a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* ===== CONTROLS (bottom right) ===== */
+#controls-bar {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 6px;
+  z-index: 90;
+}
+#controls-bar button {
+  background: rgba(12,16,28,0.95);
+  border: 1px solid #1e2740;
+  color: #8a94aa;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  backdrop-filter: blur(12px);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+#controls-bar button:hover {
+  background: #1a2540;
+  color: #e0e4ec;
+  border-color: #2a3a5a;
+}
+#controls-bar button.active {
+  background: #1a2a4a;
+  border-color: #4a8cff;
+  color: #4a8cff;
+}
+
+/* ===== TOOLTIP ===== */
+#tooltip {
+  position: absolute;
+  background: #141a2e;
+  border: 1px solid #2a3a5a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 11px;
+  max-width: 300px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 150;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+#tooltip .tt-name { font-weight: 700; color: #e8ecf2; font-size: 12px; margin-bottom: 2px; }
+#tooltip .tt-type { font-size: 10px; color: #5a6580; margin-bottom: 4px; }
+#tooltip .tt-addr { font-size: 10px; color: #4a8cff; word-break: break-all; margin-bottom: 4px; }
+#tooltip .tt-desc { color: #8a94aa; line-height: 1.4; font-size: 11px; }
+#tooltip .tt-hint { margin-top: 6px; color: #3a4a6a; font-size: 10px; font-style: italic; }
+
+/* ===== SVG STYLES ===== */
+.link-line {
+  fill: none;
+  stroke-opacity: 0.5;
+  transition: stroke-opacity 0.2s;
+}
+.link-label-text {
+  font-size: 8px;
+  fill: #4a5a7a;
+  pointer-events: none;
+  opacity: 0;
+  font-family: inherit;
+}
+.node-group { cursor: pointer; }
+.node-group:hover .node-circle { filter: brightness(1.3); }
+.node-label {
+  font-size: 10px;
+  fill: #8090b0;
+  pointer-events: none;
+  text-anchor: middle;
+  font-family: inherit;
+  font-weight: 500;
+}
+.node-circle {
+  transition: r 0.2s, filter 0.2s;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a3a5a; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4a6a; }
+
+/* ===== FADE STATES ===== */
+.faded .link-line { stroke-opacity: 0.04 !important; }
+.faded .node-group { opacity: 0.12 !important; }
+.faded .link-label-text { opacity: 0 !important; }
+.highlighted .link-line { stroke-opacity: 0.9 !important; }
+.highlighted .node-group { opacity: 1 !important; }
+.highlighted .link-label-text { opacity: 1 !important; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <h1>UMA / Polymarket Investigation</h1>
+  <span class="subtitle">Interactive Entity Connection Map &mdash; April 2026</span>
+  <div class="spacer"></div>
+  <div id="search-box">
+    <span class="search-icon">&#x1F50D;</span>
+    <input type="text" id="search-input" placeholder="Search entities..." autocomplete="off" />
+    <div id="search-results"></div>
+  </div>
+</div>
+
+<!-- FILTER PANEL -->
+<div id="filter-panel">
+  <h3>Entity Filters</h3>
+  <div class="filter-group" id="filter-list"></div>
+  <h3>Link Filters</h3>
+  <div class="filter-group" id="link-filter-list"></div>
+</div>
+
+<!-- LEGEND -->
+<div id="legend-panel">
+  <h3>Connection Types</h3>
+  <div class="legend-row">
+    <div class="legend-line legend-line-solid" style="border-color:#ff4455"></div>
+    <span>Controls / Signs</span>
+  </div>
+  <div class="legend-row">
+    <div class="legend-line legend-line-solid" style="border-color:#f0a030"></div>
+    <span>Funds / Deploys</span>
+  </div>
+  <div class="legend-row">
+    <div class="legend-line legend-line-solid" style="border-color:#4a8cff"></div>
+    <span>Invested In</span>
+  </div>
+  <div class="legend-row">
+    <div class="legend-line legend-line-solid" style="border-color:#9b59b6"></div>
+    <span>Votes / Delegates</span>
+  </div>
+  <div class="legend-row">
+    <div class="legend-line legend-line-solid" style="border-color:#2ecc71"></div>
+    <span>Deploys / Produces</span>
+  </div>
+  <div class="legend-row">
+    <div class="legend-line legend-line-dash" style="border-color:#556080"></div>
+    <span>Associated / Related</span>
+  </div>
+  <div class="legend-sep"></div>
+  <div class="legend-row">
+    <div class="legend-line legend-line-solid" style="border-color:#ff4455; border-width:3px"></div>
+    <span>Thick = strong link</span>
+  </div>
+  <div class="legend-row">
+    <div class="legend-line legend-line-solid" style="border-color:#556080; border-width:1px"></div>
+    <span>Thin = weak/indirect</span>
+  </div>
+  <div class="legend-sep"></div>
+  <h3>Node Size</h3>
+  <div class="legend-row" style="color:#6a7a9a;">
+    Proportional to UMA controlled
+  </div>
+</div>
+
+<!-- INFO PANEL -->
+<div id="info-panel">
+  <div class="ip-header">
+    <button class="ip-close" id="info-close">&times;</button>
+    <div class="ip-type-badge" id="ip-badge">PERSON</div>
+    <div class="ip-name" id="ip-name">Hart Lambur</div>
+    <div class="ip-addr" id="ip-addr"></div>
+  </div>
+  <div class="ip-section" id="ip-uma-section" style="display:none;">
+    <h4>UMA Controlled</h4>
+    <div class="ip-uma-amount" id="ip-uma-amount">6.76M</div>
+    <div class="ip-uma-label" id="ip-uma-label">staked across DV2 contracts</div>
+  </div>
+  <div class="ip-section">
+    <h4>Details</h4>
+    <div class="ip-detail" id="ip-detail"></div>
+  </div>
+  <div class="ip-section">
+    <h4>Connections</h4>
+    <div id="ip-connections"></div>
+  </div>
+</div>
+
+<!-- STATS BAR -->
+<div id="stats-bar">
+  <div class="stat-item">
+    <div class="stat-val">6.76M</div>
+    <div class="stat-label">DV2 Safe UMA (38.3%)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val">1.52M</div>
+    <div class="stat-label">Kevin Chan (8.6%)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val">1.15M</div>
+    <div class="stat-label">BornTooLate (6.5%)</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val">70.9%</div>
+    <div class="stat-label">Total Bloc Control</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-val">99.81%</div>
+    <div class="stat-label">Vote Agreement</div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls-bar">
+  <button id="btn-reset" title="Reset zoom to fit all nodes">Reset View</button>
+  <button id="btn-labels" title="Toggle node labels">Labels</button>
+  <button id="btn-bloc" title="Highlight the voting bloc">Bloc View</button>
+  <button id="btn-funding" title="Show funding flows only">Funding</button>
+  <button id="btn-freeze" title="Freeze/unfreeze simulation">Freeze</button>
+</div>
+
+<!-- TOOLTIP -->
+<div id="tooltip">
+  <div class="tt-name"></div>
+  <div class="tt-type"></div>
+  <div class="tt-addr"></div>
+  <div class="tt-desc"></div>
+  <div class="tt-hint">Click to select &middot; Drag to move</div>
+</div>
+
+<!-- GRAPH CANVAS -->
+<div id="graph-container">
+  <svg id="graph"></svg>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// =============================================================================
+// DATA — All investigation entities and connections
+// =============================================================================
+
+const NODE_TYPES = {
+  person:   { color: "#e63946", label: "People",       icon: "person" },
+  wallet:   { color: "#4a8cff", label: "Wallets",      icon: "wallet" },
+  contract: { color: "#2ecc71", label: "Contracts",     icon: "contract" },
+  org:      { color: "#9b59b6", label: "Organizations", icon: "org" },
+  exchange: { color: "#f0a030", label: "Exchanges",     icon: "exchange" },
+};
+
+const LINK_TYPES = {
+  controls:  { color: "#ff4455", width: 2.5, dash: null,  label: "Controls" },
+  funds:     { color: "#f0a030", width: 2,   dash: null,  label: "Funds" },
+  invested:  { color: "#4a8cff", width: 1.8, dash: null,  label: "Invested" },
+  votes:     { color: "#9b59b6", width: 1.8, dash: null,  label: "Votes" },
+  deploys:   { color: "#2ecc71", width: 1.5, dash: null,  label: "Deploys" },
+  associated:{ color: "#556080", width: 1.2, dash: "5,4", label: "Associated" },
+};
+
+const nodes = [
+  // ===== PEOPLE (red) =====
+  { id: "hart_lambur", label: "Hart Lambur", type: "person",
+    addr: "hal2001.eth", uma: null,
+    detail: "CEO, Risk Labs Foundation. Ex-Goldman Sachs. Signs DV2 Owner Safe (0x8180d59b) as 2-of-4 multisig signer. ENS: hal2001.eth. Made 5 proposePrice() calls on Polygon OptimisticOracleV2. Controls both sides of the UMA oracle: voting via DV2 Safe AND proposing via Polygon." },
+
+  { id: "kevin_chan", label: "Kevin Chan", type: "person",
+    addr: "maxodds.eth / 0xd2a78bb8", uma: 1520000,
+    detail: "Risk Labs Treasurer. ENS: maxodds.eth. Wallet 0xd2a78bb8. #1 UMA voter with 1.52M UMA staked. 99.81% vote agreement with DV2 bloc across 1,045 rounds. Central figure in Across Protocol ACX scandal where undisclosed wallets extracted $23M via DAO governance manipulation. 44% YES vote weight in Across DAO." },
+
+  { id: "borntoolate", label: "BornTooLate", type: "person",
+    addr: "0xfc204fcf", uma: 1150000,
+    detail: "#2 UMA voter. Wallet 0xfc204fcf. Described by UMA community as 'unprecedented attacker' after forcing $7M wrong resolution on Ukraine market. Never banned, still active. 1.15M UMA staked. Funded via Huobi through single-use intermediary chain. Received gas payments from Risk Labs gas distributor via Disperse.app. Cashed out 1.35M UMA rewards through intermediary to Coinbase 10." },
+
+  // ===== KEY WALLETS (blue) =====
+  { id: "safe_8180", label: "Risk Labs Safe", type: "wallet",
+    addr: "0x8180d59b7175d4064bdfa8138a58e9babffda44a", uma: 6760000,
+    detail: "2-of-4 multisig Safe. The central node of the investigation. Owns 86 of 89 DV2 factory contracts (holdsRole verified). Controls 6.76M UMA (38.3% of supply). Signs: Hart Lambur + 3 others. Funds satellite wallets, gas distributor, and delegate infrastructure." },
+
+  { id: "kevin_wallet", label: "Kevin Chan Wallet", type: "wallet",
+    addr: "0xd2a78bb82389d30075144d17e782964918999f7f", uma: 1520000,
+    detail: "maxodds.eth. Kevin Chan's primary voting wallet. 1.52M UMA staked. #1 individual voter on every controversial dispute. 99.81% agreement with DV2 bloc across all rounds." },
+
+  { id: "borntoolate_wallet", label: "BornTooLate Wallet", type: "wallet",
+    addr: "0xfc204fcfd2a579157898a212ea25ac98de2b1e1c", uma: 1150000,
+    detail: "BornTooLate.eth. #2 voter. 1.15M UMA still staked, 375K pending unstake. Funded via Huobi through single-use intermediary. Received 7 gas payments (0.436 ETH) from Risk Labs gas distributor." },
+
+  { id: "wallet_3", label: "Wallet #3", type: "wallet",
+    addr: "0x95cd0e455cf41e9f8cca8eee488432f3f10f29b8", uma: 1050000,
+    detail: "1.05M UMA staked. Funded directly from Risk Labs Safe (460K UMA). 99.4% vote agreement with bloc. Identical APR to 15 decimal places with other bloc wallets. Commit timing: +4h pattern. Rewards cashed out through intermediary to Coinbase 10." },
+
+  { id: "wallet_5", label: "Wallet #5", type: "wallet",
+    addr: "0x05d184b066d72cd42a1fe0fb880c3d4a0adbf8c4", uma: 968000,
+    detail: "968K UMA staked. Funded from Risk Labs Safe (299K UMA) + partial from Kraken 142. 99.6% vote agreement with bloc. Identical APR pattern. Fast follower: commits +7min after bloc. Rewards cashed out through intermediary to Coinbase 10." },
+
+  { id: "wallet_4", label: "Wallet #4", type: "wallet",
+    addr: "0xeaf0f2eab859d1036ec14f8c4a1a7da8e4ef6aff", uma: 451000,
+    detail: "451K UMA. Funded from Risk Labs Safe in Mar 2026. Delegates all voting to automated bot 0xaf4c. Migrated from emptied DV2 contract 0xbd9e." },
+
+  { id: "eoa_240d", label: "EOA 0x240d", type: "wallet",
+    addr: "0x240d2243d90e8968d0c8e807202bc8a2de0dc53c", uma: 141000,
+    detail: "141K UMA. Funded through chain: Safe -> 0x7ceb -> 0x240d. Daily multicall + withdrawAndRestake since Mar 26, 2026." },
+
+  { id: "delegate_bot", label: "Delegate Bot 0xaf4c", type: "wallet",
+    addr: "0xaf4c815cf13bc8671a2a12bde62aabec24651ccc", uma: null,
+    detail: "Automated voting delegate. 827 transactions. Daily multicall() on VotingV2. Votes on behalf of Wallet #4 (and previously for DV2 0xbd9e). Safe-funded wallets delegate to this bot." },
+
+  { id: "gas_distributor", label: "Gas Distributor 0x774b", type: "wallet",
+    addr: "0x774bFF0CCD2f7546B67D4071DEF9Ba154bA549B1", uma: null,
+    detail: "Gas rebate distributor. Funded from Risk Labs Safe with 219 ETH total (23 transactions). Uses Disperse.app to batch-send gas ETH to DV2 contracts, Kevin Chan, BornTooLate (7 payments, 0.436 ETH), and other bloc voters." },
+
+  // ===== CONTRACTS (green) =====
+  { id: "dv2_factory", label: "DV2 Factory", type: "contract",
+    addr: "0x6b46a05f", uma: null,
+    detail: "DesignatedVotingV2 factory contract. Produced 89 DV2 contracts total. Factory is permissionless but 86 of the 89 contracts are owned by the same Risk Labs Safe. 52 deployed by Risk Labs: Deployer, 37 by other callers." },
+
+  { id: "votingv2", label: "VotingV2", type: "contract",
+    addr: "0x004395eD00Fa51016e855Fd77B3f5dB17BC26bAb", uma: null,
+    detail: "Main UMA voting contract on Ethereum mainnet. All vote commits and reveals happen here. The DV2 bloc shows 100% internal agreement on all disputed rounds through this contract." },
+
+  { id: "oov2_polygon", label: "OOv2 (Polygon)", type: "contract",
+    addr: "0xeE3Afe347D5C74317041E2618C49534dAf887c24", uma: null,
+    detail: "OptimisticOracleV2 on Polygon. Where Polymarket resolutions are proposed. Hart Lambur made 5 direct proposePrice() calls here. UMIP-189 (Aug 2025) restricted proposers to MOOV2 whitelist." },
+
+  { id: "new_adapter", label: "New UmaCtfAdapter", type: "contract",
+    addr: "0x2c0367a9Fd5d667014A4b8E45E1A4A7e36c365a9", uma: null,
+    detail: "Current UmaCtfAdapter on Polygon. Bridges UMA oracle resolutions to Polymarket's CTF (Conditional Token Framework). Replaced the old adapter." },
+
+  { id: "old_adapter", label: "Old UmaCtfAdapter", type: "contract",
+    addr: "0xcb1822859cEF82Cd2Eb4E6276C7916e692995130", uma: null,
+    detail: "Previous UmaCtfAdapter on Polygon. Replaced by the new adapter. Historical disputes used this contract." },
+
+  { id: "dv2_top1", label: "DV2 0x0afc (831K)", type: "contract",
+    addr: "0x0afc9a935960948ed35e50ac7639cbb38e840b38", uma: 831000,
+    detail: "Largest individual DV2 contract. 831K UMA staked. Owned by Risk Labs Safe (holdsRole verified). Deployed by Risk Labs: Deployer." },
+
+  { id: "dv2_top2", label: "DV2 0x487a (679K)", type: "contract",
+    addr: "0x487a5bbdc6091be0e27c0e8ea283047d94862538", uma: 679000,
+    detail: "Second largest DV2 contract. 679K UMA staked. Owned by Risk Labs Safe. Same factory, same owner pattern." },
+
+  { id: "dv2_top3", label: "DV2 0x326c (449K)", type: "contract",
+    addr: "0x326c819380b8842e3a55e5f97f6011ee91844205", uma: 449000,
+    detail: "Third largest DV2 contract. 449K UMA staked. Part of the 86 Safe-owned DV2 contracts (holdsRole verified on all 89)." },
+
+  // ===== ORGANIZATIONS (purple) =====
+  { id: "risk_labs", label: "Risk Labs", type: "org",
+    addr: null, uma: null,
+    detail: "Risk Labs Foundation. Created UMA Protocol and Across Protocol. Hart Lambur = CEO, Kevin Chan = Treasurer, Allison Lu = Co-Founder. Controls the Safe, deploys DV2 contracts, manages the oracle. The entity at the center of the conflict-of-interest allegations." },
+
+  { id: "polymarket", label: "Polymarket", type: "org",
+    addr: null, uma: null,
+    detail: "Largest prediction market platform. $15B valuation (Bloomberg Apr 2026). Depends entirely on UMA for dispute resolution. Shared investors with Risk Labs (Coinbase Ventures, Dragonfly, Blockchain Capital). Building alternative POLY token oracle but not yet launched." },
+
+  { id: "coinbase_ventures", label: "Coinbase Ventures", type: "org",
+    addr: null, uma: null,
+    detail: "Invested in BOTH Risk Labs/UMA (2018 seed round) AND Polymarket (2025). Creates dual conflict of interest: investor in both the oracle provider and the platform it secures." },
+
+  { id: "dragonfly", label: "Dragonfly Capital", type: "org",
+    addr: null, uma: null,
+    detail: "Invested in BOTH Risk Labs/UMA (2018 seed) AND Polymarket (Series B $45M + $150M round). Dual conflict of interest." },
+
+  { id: "blockchain_capital", label: "Blockchain Capital", type: "org",
+    addr: null, uma: null,
+    detail: "Invested in BOTH Risk Labs/UMA (2018 seed) AND Polymarket (led $55M pre-election round). Dual conflict of interest." },
+
+  { id: "cftc", label: "CFTC", type: "org",
+    addr: null, uma: null,
+    detail: "Commodity Futures Trading Commission. US regulatory body with oversight of Polymarket. Polymarket paid $1.4M fine in 2022. Regulatory relevance: oracle manipulation could constitute market manipulation under CFTC rules." },
+
+  { id: "across_protocol", label: "Across Protocol", type: "org",
+    addr: null, uma: null,
+    detail: "Cross-chain bridge built by Risk Labs. $0 protocol revenue (fees go to LPs). Kevin Chan extracted $23M via ACX DAO governance using undisclosed wallets (44% vote weight). Same team, same conflict patterns." },
+
+  // ===== EXCHANGES (orange) =====
+  { id: "coinbase_10", label: "Coinbase 10", type: "exchange",
+    addr: "0xa9d1e08c7793af67e9d92fe308d5697fb81d3e43", uma: null,
+    detail: "Coinbase exchange deposit address (labeled 'Coinbase 10' on Etherscan). Aggregation/cashout point for UMA voting rewards. BornTooLate, Wallet #3, and Wallet #5 all route rewards through intermediaries to this address." },
+
+  { id: "huobi", label: "Huobi / HTX", type: "exchange",
+    addr: null, uma: null,
+    detail: "BornTooLate's funding origin. UMA tokens were sent from Huobi through a single-use intermediary wallet to BornTooLate's voting wallet. This intermediary-chain pattern is designed to obscure the original source." },
+
+  { id: "kraken_142", label: "Kraken 142", type: "exchange",
+    addr: null, uma: null,
+    detail: "Partial funding source for Wallet #5 (alongside Risk Labs Safe funding of 299K UMA). Suggests Wallet #5 may have mixed external + insider funding." },
+];
+
+const links = [
+  // ===== Hart Lambur connections =====
+  { source: "hart_lambur", target: "safe_8180",     type: "controls",   label: "Signs (2-of-4)" },
+  { source: "hart_lambur", target: "oov2_polygon",  type: "controls",   label: "5 proposePrice() calls" },
+  { source: "hart_lambur", target: "risk_labs",      type: "associated", label: "CEO" },
+
+  // ===== Safe -> DV2 contracts =====
+  { source: "safe_8180", target: "dv2_top1",     type: "controls", label: "Owns (holdsRole)" },
+  { source: "safe_8180", target: "dv2_top2",     type: "controls", label: "Owns (holdsRole)" },
+  { source: "safe_8180", target: "dv2_top3",     type: "controls", label: "Owns (holdsRole)" },
+
+  // ===== Safe -> funded wallets =====
+  { source: "safe_8180", target: "wallet_3",      type: "funds", label: "Funded 460K UMA" },
+  { source: "safe_8180", target: "wallet_5",      type: "funds", label: "Funded 299K UMA" },
+  { source: "safe_8180", target: "wallet_4",      type: "funds", label: "Funded Mar 2026" },
+  { source: "safe_8180", target: "eoa_240d",      type: "funds", label: "Via Safe->0x7ceb chain" },
+  { source: "safe_8180", target: "gas_distributor",type: "funds", label: "219 ETH total" },
+
+  // ===== Gas distributor -> recipients =====
+  { source: "gas_distributor", target: "borntoolate_wallet", type: "funds", label: "7 gas payments (0.436 ETH)" },
+  { source: "gas_distributor", target: "kevin_wallet",       type: "funds", label: "Gas rebate" },
+  { source: "gas_distributor", target: "dv2_top1",           type: "funds", label: "Gas rebate" },
+  { source: "gas_distributor", target: "dv2_top2",           type: "funds", label: "Gas rebate" },
+
+  // ===== Kevin Chan -> voting =====
+  { source: "kevin_chan", target: "kevin_wallet",  type: "controls",   label: "Is / owns" },
+  { source: "kevin_wallet", target: "votingv2",    type: "votes",      label: "#1 voter, 1.52M UMA" },
+  { source: "kevin_chan", target: "across_protocol",type: "associated", label: "44% YES vote ($23M)" },
+
+  // ===== BornTooLate connections =====
+  { source: "borntoolate", target: "borntoolate_wallet", type: "controls", label: "Is / owns" },
+  { source: "huobi", target: "borntoolate_wallet",       type: "funds",    label: "Via single-use intermediary" },
+  { source: "borntoolate_wallet", target: "coinbase_10", type: "funds",    label: "1.35M UMA cashout via 0xa99e" },
+
+  // ===== Wallet cashout paths =====
+  { source: "wallet_3", target: "coinbase_10", type: "funds",    label: "Rewards cashout via intermediary" },
+  { source: "wallet_5", target: "coinbase_10", type: "funds",    label: "Rewards cashout via intermediary" },
+  { source: "kraken_142", target: "wallet_5",  type: "funds",    label: "Partial funding" },
+
+  // ===== Wallet #4 -> delegation =====
+  { source: "wallet_4", target: "delegate_bot", type: "votes", label: "Delegates voting" },
+
+  // ===== DV2 Factory -> contracts =====
+  { source: "dv2_factory", target: "dv2_top1", type: "deploys", label: "Produced" },
+  { source: "dv2_factory", target: "dv2_top2", type: "deploys", label: "Produced" },
+  { source: "dv2_factory", target: "dv2_top3", type: "deploys", label: "Produced" },
+
+  // ===== DV2 -> VotingV2 =====
+  { source: "dv2_top1", target: "votingv2", type: "votes", label: "Votes (100% agreement)" },
+  { source: "dv2_top2", target: "votingv2", type: "votes", label: "Votes (100% agreement)" },
+  { source: "dv2_top3", target: "votingv2", type: "votes", label: "Votes (100% agreement)" },
+
+  // ===== Bloc vote agreement =====
+  { source: "kevin_wallet", target: "wallet_3",         type: "associated", label: "99.81% agreement" },
+  { source: "kevin_wallet", target: "wallet_5",         type: "associated", label: "99.81% agreement" },
+  { source: "kevin_wallet", target: "borntoolate_wallet",type: "associated",label: "Majority-aligned" },
+  { source: "kevin_wallet", target: "wallet_4",         type: "associated", label: "Votes via bot" },
+
+  // ===== Safe -> delegation =====
+  { source: "safe_8180", target: "delegate_bot", type: "associated", label: "34-wallet delegation target" },
+
+  // ===== Risk Labs -> Polymarket =====
+  { source: "risk_labs", target: "polymarket",      type: "associated", label: "Oracle provider" },
+  { source: "risk_labs", target: "across_protocol", type: "associated", label: "Built by same team" },
+
+  // ===== Adapters =====
+  { source: "oov2_polygon",  target: "new_adapter", type: "associated", label: "Resolution pipeline" },
+  { source: "new_adapter",   target: "polymarket",  type: "associated", label: "CTF bridge" },
+
+  // ===== VCs -> both sides =====
+  { source: "coinbase_ventures",  target: "risk_labs",  type: "invested", label: "Seed 2018" },
+  { source: "coinbase_ventures",  target: "polymarket", type: "invested", label: "2025" },
+  { source: "dragonfly",          target: "risk_labs",  type: "invested", label: "Seed 2018" },
+  { source: "dragonfly",          target: "polymarket", type: "invested", label: "Series B + $150M" },
+  { source: "blockchain_capital", target: "risk_labs",  type: "invested", label: "Seed 2018" },
+  { source: "blockchain_capital", target: "polymarket", type: "invested", label: "Led $55M" },
+
+  // ===== CFTC =====
+  { source: "cftc", target: "polymarket", type: "associated", label: "Regulatory oversight" },
+];
+
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const svg = d3.select("#graph")
+  .attr("width", width)
+  .attr("height", height);
+
+const defs = svg.append("defs");
+
+// Glow filter
+const glowFilter = defs.append("filter").attr("id", "glow");
+glowFilter.append("feGaussianBlur").attr("stdDeviation", "3").attr("result", "blur");
+const glowMerge = glowFilter.append("feMerge");
+glowMerge.append("feMergeNode").attr("in", "blur");
+glowMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+// Arrow markers for each link type
+Object.entries(LINK_TYPES).forEach(([type, cfg]) => {
+  defs.append("marker")
+    .attr("id", `arrow-${type}`)
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 28)
+    .attr("refY", 0)
+    .attr("markerWidth", 5)
+    .attr("markerHeight", 5)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-4L10,0L0,4")
+    .attr("fill", cfg.color)
+    .attr("opacity", 0.7);
+});
+
+const g = svg.append("g");
+
+// =============================================================================
+// ZOOM
+// =============================================================================
+const zoomBehavior = d3.zoom()
+  .scaleExtent([0.15, 5])
+  .on("zoom", (event) => {
+    g.attr("transform", event.transform);
+  });
+svg.call(zoomBehavior);
+
+// =============================================================================
+// FORCE SIMULATION
+// =============================================================================
+
+function getNodeRadius(d) {
+  if (d.uma && d.uma > 0) {
+    return Math.max(10, Math.min(40, 8 + Math.sqrt(d.uma / 10000)));
+  }
+  const defaults = { person: 16, wallet: 12, contract: 10, org: 18, exchange: 13 };
+  return defaults[d.type] || 12;
+}
+
+const simulation = d3.forceSimulation(nodes)
+  .force("link", d3.forceLink(links).id(d => d.id).distance(d => {
+    if (d.type === "controls") return 90;
+    if (d.type === "funds") return 110;
+    if (d.type === "invested") return 160;
+    if (d.type === "votes") return 100;
+    if (d.type === "deploys") return 100;
+    return 130;
+  }).strength(d => {
+    if (d.type === "controls") return 0.7;
+    if (d.type === "funds") return 0.5;
+    return 0.3;
+  }))
+  .force("charge", d3.forceManyBody().strength(-500).distanceMax(500))
+  .force("center", d3.forceCenter(width / 2, height / 2))
+  .force("collision", d3.forceCollide().radius(d => getNodeRadius(d) + 15))
+  .force("x", d3.forceX(width / 2).strength(0.04))
+  .force("y", d3.forceY(height / 2).strength(0.04));
+
+// =============================================================================
+// RENDER LINKS
+// =============================================================================
+
+const linkGroup = g.append("g").attr("class", "links-group");
+
+const linkElements = linkGroup.selectAll("line")
+  .data(links)
+  .join("line")
+  .attr("class", "link-line")
+  .attr("stroke", d => LINK_TYPES[d.type]?.color || "#556080")
+  .attr("stroke-width", d => LINK_TYPES[d.type]?.width || 1.2)
+  .attr("stroke-dasharray", d => LINK_TYPES[d.type]?.dash || "none")
+  .attr("marker-end", d => `url(#arrow-${d.type})`);
+
+// Link labels
+const linkLabelGroup = g.append("g").attr("class", "link-labels-group");
+
+const linkLabels = linkLabelGroup.selectAll("text")
+  .data(links)
+  .join("text")
+  .attr("class", "link-label-text")
+  .text(d => d.label);
+
+// =============================================================================
+// RENDER NODES
+// =============================================================================
+
+const nodeGroup = g.append("g").attr("class", "nodes-group");
+
+const nodeElements = nodeGroup.selectAll("g")
+  .data(nodes)
+  .join("g")
+  .attr("class", "node-group")
+  .attr("data-type", d => d.type)
+  .call(d3.drag()
+    .on("start", dragStarted)
+    .on("drag", dragged)
+    .on("end", dragEnded));
+
+// Outer glow ring
+nodeElements.append("circle")
+  .attr("class", "node-glow")
+  .attr("r", d => getNodeRadius(d) + 4)
+  .attr("fill", "none")
+  .attr("stroke", d => NODE_TYPES[d.type]?.color || "#888")
+  .attr("stroke-width", 1)
+  .attr("stroke-opacity", 0.25);
+
+// Main circle
+nodeElements.append("circle")
+  .attr("class", "node-circle")
+  .attr("r", d => getNodeRadius(d))
+  .attr("fill", d => {
+    const c = NODE_TYPES[d.type]?.color || "#888";
+    return d3.color(c).darker(0.3);
+  })
+  .attr("stroke", d => NODE_TYPES[d.type]?.color || "#888")
+  .attr("stroke-width", 2)
+  .attr("opacity", 0.9);
+
+// Inner icon indicator
+nodeElements.append("circle")
+  .attr("class", "node-inner")
+  .attr("r", d => Math.max(3, getNodeRadius(d) * 0.35))
+  .attr("fill", d => NODE_TYPES[d.type]?.color || "#888")
+  .attr("opacity", 0.6);
+
+// Node labels
+const nodeLabels = nodeElements.append("text")
+  .attr("class", "node-label")
+  .attr("dy", d => getNodeRadius(d) + 14)
+  .text(d => d.label)
+  .attr("fill", d => {
+    const c = NODE_TYPES[d.type]?.color || "#888";
+    return d3.color(c).brighter(0.5);
+  });
+
+// =============================================================================
+// TOOLTIP
+// =============================================================================
+const tooltip = d3.select("#tooltip");
+
+nodeElements
+  .on("mouseover", function(event, d) {
+    if (selectedNode && selectedNode.id === d.id) return;
+    tooltip.style("opacity", 1);
+    tooltip.select(".tt-name").text(d.label);
+    tooltip.select(".tt-type").text(NODE_TYPES[d.type]?.label || d.type);
+    tooltip.select(".tt-addr").text(d.addr || "");
+    tooltip.select(".tt-desc").text(d.detail?.substring(0, 150) + (d.detail?.length > 150 ? "..." : ""));
+
+    positionTooltip(event);
+
+    // Highlight connections on hover (only if nothing is selected)
+    if (!selectedNode) {
+      highlightConnections(d);
+    }
+  })
+  .on("mousemove", function(event) {
+    positionTooltip(event);
+  })
+  .on("mouseout", function() {
+    tooltip.style("opacity", 0);
+    if (!selectedNode) {
+      clearHighlight();
+    }
+  })
+  .on("click", function(event, d) {
+    event.stopPropagation();
+    selectNode(d);
+  });
+
+svg.on("click", function() {
+  deselectNode();
+});
+
+function positionTooltip(event) {
+  let x = event.pageX + 16;
+  let y = event.pageY - 10;
+  if (x + 310 > width) x = event.pageX - 310;
+  if (y + 200 > height) y = event.pageY - 200;
+  tooltip.style("left", x + "px").style("top", y + "px");
+}
+
+// =============================================================================
+// HIGHLIGHT / SELECT
+// =============================================================================
+
+let selectedNode = null;
+
+function getConnectedIds(d) {
+  const ids = new Set([d.id]);
+  links.forEach(l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    if (sid === d.id) ids.add(tid);
+    if (tid === d.id) ids.add(sid);
+  });
+  return ids;
+}
+
+function highlightConnections(d) {
+  const connected = getConnectedIds(d);
+
+  nodeElements
+    .classed("faded", n => !connected.has(n.id))
+    .classed("highlighted", n => connected.has(n.id))
+    .style("opacity", n => connected.has(n.id) ? 1 : 0.12);
+
+  linkElements
+    .classed("faded", l => {
+      const sid = typeof l.source === "object" ? l.source.id : l.source;
+      const tid = typeof l.target === "object" ? l.target.id : l.target;
+      return !(sid === d.id || tid === d.id);
+    })
+    .classed("highlighted", l => {
+      const sid = typeof l.source === "object" ? l.source.id : l.source;
+      const tid = typeof l.target === "object" ? l.target.id : l.target;
+      return sid === d.id || tid === d.id;
+    })
+    .style("stroke-opacity", l => {
+      const sid = typeof l.source === "object" ? l.source.id : l.source;
+      const tid = typeof l.target === "object" ? l.target.id : l.target;
+      return (sid === d.id || tid === d.id) ? 0.9 : 0.04;
+    });
+
+  linkLabels.style("opacity", l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    return (sid === d.id || tid === d.id) ? 1 : 0;
+  });
+}
+
+function clearHighlight() {
+  nodeElements
+    .classed("faded", false)
+    .classed("highlighted", false)
+    .style("opacity", null);
+
+  linkElements
+    .classed("faded", false)
+    .classed("highlighted", false)
+    .style("stroke-opacity", null);
+
+  linkLabels.style("opacity", null);
+}
+
+function selectNode(d) {
+  selectedNode = d;
+  tooltip.style("opacity", 0);
+  highlightConnections(d);
+  showInfoPanel(d);
+}
+
+function deselectNode() {
+  selectedNode = null;
+  clearHighlight();
+  hideInfoPanel();
+}
+
+// =============================================================================
+// INFO PANEL
+// =============================================================================
+
+function showInfoPanel(d) {
+  const panel = document.getElementById("info-panel");
+  panel.classList.add("visible");
+
+  const badge = document.getElementById("ip-badge");
+  badge.textContent = (NODE_TYPES[d.type]?.label || d.type).toUpperCase();
+  badge.style.background = NODE_TYPES[d.type]?.color + "22";
+  badge.style.color = NODE_TYPES[d.type]?.color;
+
+  document.getElementById("ip-name").textContent = d.label;
+
+  const addrEl = document.getElementById("ip-addr");
+  if (d.addr && d.addr.startsWith("0x") && d.addr.length >= 10) {
+    const fullAddr = d.addr;
+    const shortAddr = fullAddr.length > 20 ? fullAddr.substring(0, 10) + "..." + fullAddr.substring(fullAddr.length - 8) : fullAddr;
+    addrEl.innerHTML = `<a href="https://etherscan.io/address/${fullAddr}" target="_blank" rel="noopener">${shortAddr}</a> (Etherscan)`;
+  } else if (d.addr) {
+    addrEl.textContent = d.addr;
+  } else {
+    addrEl.textContent = "";
+  }
+
+  // UMA amount
+  const umaSection = document.getElementById("ip-uma-section");
+  if (d.uma && d.uma > 0) {
+    umaSection.style.display = "block";
+    const formatted = d.uma >= 1000000 ? (d.uma / 1000000).toFixed(2) + "M" : (d.uma / 1000).toFixed(0) + "K";
+    document.getElementById("ip-uma-amount").textContent = formatted + " UMA";
+    const pct = ((d.uma / 17640000) * 100).toFixed(1);
+    document.getElementById("ip-uma-label").textContent = `~${pct}% of circulating supply`;
+  } else {
+    umaSection.style.display = "none";
+  }
+
+  document.getElementById("ip-detail").textContent = d.detail || "No details available.";
+
+  // Connections list
+  const connDiv = document.getElementById("ip-connections");
+  connDiv.innerHTML = "";
+
+  links.forEach(l => {
+    const sid = typeof l.source === "object" ? l.source.id : l.source;
+    const tid = typeof l.target === "object" ? l.target.id : l.target;
+    let connNode = null;
+    let direction = "";
+    if (sid === d.id) {
+      connNode = nodes.find(n => n.id === tid);
+      direction = "to";
+    } else if (tid === d.id) {
+      connNode = nodes.find(n => n.id === sid);
+      direction = "from";
+    }
+    if (connNode) {
+      const item = document.createElement("div");
+      item.className = "ip-conn-item";
+      item.innerHTML = `
+        <div class="ip-conn-dot" style="background:${NODE_TYPES[connNode.type]?.color || '#888'}"></div>
+        <span class="ip-conn-name">${direction === "from" ? "&larr; " : "&rarr; "}${connNode.label}</span>
+        <span class="ip-conn-rel">${l.label}</span>
+      `;
+      item.addEventListener("click", () => {
+        selectNode(connNode);
+        // Pan to node
+        const t = d3.zoomTransform(svg.node());
+        const nx = connNode.x * t.k + t.x;
+        const ny = connNode.y * t.k + t.y;
+        if (nx < 0 || nx > width || ny < 0 || ny > height) {
+          svg.transition().duration(600).call(
+            zoomBehavior.transform,
+            d3.zoomIdentity.translate(width / 2 - connNode.x * t.k, height / 2 - connNode.y * t.k).scale(t.k)
+          );
+        }
+      });
+      connDiv.appendChild(item);
+    }
+  });
+}
+
+function hideInfoPanel() {
+  document.getElementById("info-panel").classList.remove("visible");
+}
+
+document.getElementById("info-close").addEventListener("click", (e) => {
+  e.stopPropagation();
+  deselectNode();
+});
+
+// =============================================================================
+// SEARCH
+// =============================================================================
+
+const searchInput = document.getElementById("search-input");
+const searchResults = document.getElementById("search-results");
+
+searchInput.addEventListener("input", () => {
+  const q = searchInput.value.toLowerCase().trim();
+  searchResults.innerHTML = "";
+  if (!q) { searchResults.style.display = "none"; return; }
+
+  const matches = nodes.filter(n =>
+    n.label.toLowerCase().includes(q) ||
+    (n.addr && n.addr.toLowerCase().includes(q)) ||
+    (n.detail && n.detail.toLowerCase().includes(q))
+  ).slice(0, 10);
+
+  if (matches.length === 0) {
+    searchResults.style.display = "none";
+    return;
+  }
+
+  searchResults.style.display = "block";
+  matches.forEach(n => {
+    const item = document.createElement("div");
+    item.className = "sr-item";
+    item.innerHTML = `
+      <div class="sr-dot" style="background:${NODE_TYPES[n.type]?.color || '#888'}"></div>
+      <span class="sr-label">${n.label}</span>
+      <span class="sr-type">${NODE_TYPES[n.type]?.label || n.type}</span>
+    `;
+    item.addEventListener("click", () => {
+      searchInput.value = "";
+      searchResults.style.display = "none";
+      selectNode(n);
+      // Pan to node
+      const t = d3.zoomTransform(svg.node());
+      svg.transition().duration(600).call(
+        zoomBehavior.transform,
+        d3.zoomIdentity.translate(width / 2 - n.x * t.k, height / 2 - n.y * t.k).scale(t.k)
+      );
+    });
+    searchResults.appendChild(item);
+  });
+});
+
+searchInput.addEventListener("blur", () => {
+  setTimeout(() => { searchResults.style.display = "none"; }, 200);
+});
+
+searchInput.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    searchInput.value = "";
+    searchResults.style.display = "none";
+    searchInput.blur();
+  }
+});
+
+// =============================================================================
+// FILTER CHECKBOXES
+// =============================================================================
+
+const filterState = {};
+Object.keys(NODE_TYPES).forEach(t => { filterState[t] = true; });
+
+const linkFilterState = {};
+Object.keys(LINK_TYPES).forEach(t => { linkFilterState[t] = true; });
+
+function buildFilterUI() {
+  const filterList = document.getElementById("filter-list");
+  Object.entries(NODE_TYPES).forEach(([key, cfg]) => {
+    const count = nodes.filter(n => n.type === key).length;
+    const label = document.createElement("label");
+    label.className = "filter-item";
+    label.innerHTML = `
+      <input type="checkbox" checked data-filter-type="${key}">
+      <div class="filter-check"></div>
+      <div class="filter-dot" style="background:${cfg.color}"></div>
+      <span class="filter-label">${cfg.label}</span>
+      <span class="filter-count">${count}</span>
+    `;
+    label.querySelector("input").addEventListener("change", (e) => {
+      filterState[key] = e.target.checked;
+      applyFilters();
+    });
+    filterList.appendChild(label);
+  });
+
+  const linkFilterList = document.getElementById("link-filter-list");
+  Object.entries(LINK_TYPES).forEach(([key, cfg]) => {
+    const count = links.filter(l => l.type === key).length;
+    const label = document.createElement("label");
+    label.className = "filter-item";
+    label.innerHTML = `
+      <input type="checkbox" checked data-link-filter="${key}">
+      <div class="filter-check"></div>
+      <div class="filter-dot" style="background:${cfg.color}; border-radius:2px;"></div>
+      <span class="filter-label">${cfg.label}</span>
+      <span class="filter-count">${count}</span>
+    `;
+    label.querySelector("input").addEventListener("change", (e) => {
+      linkFilterState[key] = e.target.checked;
+      applyFilters();
+    });
+    linkFilterList.appendChild(label);
+  });
+}
+
+function applyFilters() {
+  nodeElements.style("display", d => filterState[d.type] ? null : "none");
+
+  linkElements.style("display", d => {
+    const sid = typeof d.source === "object" ? d.source.id : d.source;
+    const tid = typeof d.target === "object" ? d.target.id : d.target;
+    const sNode = nodes.find(n => n.id === sid);
+    const tNode = nodes.find(n => n.id === tid);
+    const nodeVisible = filterState[sNode?.type] && filterState[tNode?.type];
+    const linkVisible = linkFilterState[d.type];
+    return (nodeVisible && linkVisible) ? null : "none";
+  });
+
+  linkLabels.style("display", d => {
+    const sid = typeof d.source === "object" ? d.source.id : d.source;
+    const tid = typeof d.target === "object" ? d.target.id : d.target;
+    const sNode = nodes.find(n => n.id === sid);
+    const tNode = nodes.find(n => n.id === tid);
+    const nodeVisible = filterState[sNode?.type] && filterState[tNode?.type];
+    const linkVisible = linkFilterState[d.type];
+    return (nodeVisible && linkVisible) ? null : "none";
+  });
+}
+
+buildFilterUI();
+
+// =============================================================================
+// SIMULATION TICK
+// =============================================================================
+
+simulation.on("tick", () => {
+  linkElements
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y);
+
+  linkLabels
+    .attr("x", d => (d.source.x + d.target.x) / 2)
+    .attr("y", d => (d.source.y + d.target.y) / 2)
+    .attr("transform", d => {
+      const dx = d.target.x - d.source.x;
+      const dy = d.target.y - d.source.y;
+      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      const mx = (d.source.x + d.target.x) / 2;
+      const my = (d.source.y + d.target.y) / 2;
+      const corrected = (angle > 90 || angle < -90) ? angle + 180 : angle;
+      return `rotate(${corrected}, ${mx}, ${my})`;
+    });
+
+  nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+// =============================================================================
+// DRAG
+// =============================================================================
+
+function dragStarted(event) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  event.subject.fx = event.subject.x;
+  event.subject.fy = event.subject.y;
+}
+
+function dragged(event) {
+  event.subject.fx = event.x;
+  event.subject.fy = event.y;
+}
+
+function dragEnded(event) {
+  if (!event.active) simulation.alphaTarget(0);
+  if (!frozen) {
+    event.subject.fx = null;
+    event.subject.fy = null;
+  }
+}
+
+// =============================================================================
+// CONTROL BUTTONS
+// =============================================================================
+
+let labelsVisible = true;
+let blocActive = false;
+let fundingActive = false;
+let frozen = false;
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  fitToView();
+});
+
+document.getElementById("btn-labels").addEventListener("click", function() {
+  labelsVisible = !labelsVisible;
+  nodeLabels.style("opacity", labelsVisible ? null : 0);
+  linkLabels.style("visibility", labelsVisible ? null : "hidden");
+  this.classList.toggle("active", labelsVisible);
+});
+
+document.getElementById("btn-bloc").addEventListener("click", function() {
+  blocActive = !blocActive;
+  this.classList.toggle("active", blocActive);
+
+  if (fundingActive) {
+    fundingActive = false;
+    document.getElementById("btn-funding").classList.remove("active");
+  }
+
+  if (blocActive) {
+    const blocIds = new Set([
+      "safe_8180", "kevin_chan", "kevin_wallet", "borntoolate", "borntoolate_wallet",
+      "wallet_3", "wallet_4", "wallet_5", "eoa_240d", "delegate_bot",
+      "dv2_top1", "dv2_top2", "dv2_top3", "gas_distributor",
+      "votingv2", "hart_lambur"
+    ]);
+
+    nodeElements.style("opacity", d => blocIds.has(d.id) ? 1 : 0.08);
+    nodeElements.select(".node-circle")
+      .attr("r", d => blocIds.has(d.id) ? getNodeRadius(d) * 1.2 : getNodeRadius(d) * 0.7);
+    nodeElements.select(".node-glow")
+      .attr("r", d => blocIds.has(d.id) ? getNodeRadius(d) * 1.2 + 4 : getNodeRadius(d) * 0.7 + 4)
+      .attr("stroke-opacity", d => blocIds.has(d.id) ? 0.5 : 0.05);
+
+    linkElements.style("stroke-opacity", l => {
+      const sid = typeof l.source === "object" ? l.source.id : l.source;
+      const tid = typeof l.target === "object" ? l.target.id : l.target;
+      return (blocIds.has(sid) && blocIds.has(tid)) ? 0.85 : 0.03;
+    });
+    linkLabels.style("opacity", l => {
+      const sid = typeof l.source === "object" ? l.source.id : l.source;
+      const tid = typeof l.target === "object" ? l.target.id : l.target;
+      return (blocIds.has(sid) && blocIds.has(tid)) ? 1 : 0;
+    });
+    nodeLabels.style("opacity", d => blocIds.has(d.id) ? 1 : 0.08);
+  } else {
+    resetVisuals();
+  }
+});
+
+document.getElementById("btn-funding").addEventListener("click", function() {
+  fundingActive = !fundingActive;
+  this.classList.toggle("active", fundingActive);
+
+  if (blocActive) {
+    blocActive = false;
+    document.getElementById("btn-bloc").classList.remove("active");
+  }
+
+  if (fundingActive) {
+    const fundingLinks = links.filter(l => l.type === "funds");
+    const fundingNodeIds = new Set();
+    fundingLinks.forEach(l => {
+      fundingNodeIds.add(typeof l.source === "object" ? l.source.id : l.source);
+      fundingNodeIds.add(typeof l.target === "object" ? l.target.id : l.target);
+    });
+
+    nodeElements.style("opacity", d => fundingNodeIds.has(d.id) ? 1 : 0.08);
+    linkElements.style("stroke-opacity", l => l.type === "funds" ? 0.9 : 0.03);
+    linkLabels.style("opacity", l => l.type === "funds" ? 1 : 0);
+    nodeLabels.style("opacity", d => fundingNodeIds.has(d.id) ? 1 : 0.08);
+  } else {
+    resetVisuals();
+  }
+});
+
+document.getElementById("btn-freeze").addEventListener("click", function() {
+  frozen = !frozen;
+  this.classList.toggle("active", frozen);
+
+  if (frozen) {
+    simulation.stop();
+    nodes.forEach(n => { n.fx = n.x; n.fy = n.y; });
+  } else {
+    nodes.forEach(n => { n.fx = null; n.fy = null; });
+    simulation.alpha(0.3).restart();
+  }
+});
+
+function resetVisuals() {
+  nodeElements.style("opacity", null);
+  nodeElements.select(".node-circle").attr("r", d => getNodeRadius(d));
+  nodeElements.select(".node-glow")
+    .attr("r", d => getNodeRadius(d) + 4)
+    .attr("stroke-opacity", 0.25);
+  linkElements.style("stroke-opacity", null);
+  linkLabels.style("opacity", null);
+  nodeLabels.style("opacity", labelsVisible ? null : 0);
+}
+
+// =============================================================================
+// FIT TO VIEW
+// =============================================================================
+
+function fitToView() {
+  const bounds = g.node().getBBox();
+  if (bounds.width === 0 || bounds.height === 0) return;
+
+  const padding = 80;
+  const fullWidth = bounds.width + padding * 2;
+  const fullHeight = bounds.height + padding * 2;
+  const midX = bounds.x + bounds.width / 2;
+  const midY = bounds.y + bounds.height / 2;
+  const scale = Math.min(0.9, Math.min((width - 440) / fullWidth, (height - 120) / fullHeight));
+  const tx = width / 2 - scale * midX;
+  const ty = height / 2 - scale * midY;
+
+  svg.transition().duration(800).call(
+    zoomBehavior.transform,
+    d3.zoomIdentity.translate(tx, ty).scale(scale)
+  );
+}
+
+// Auto-fit after simulation settles
+setTimeout(fitToView, 2500);
+
+// =============================================================================
+// KEYBOARD SHORTCUTS
+// =============================================================================
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "/" || e.key === "f") {
+    e.preventDefault();
+    searchInput.focus();
+  }
+  if (e.key === "Escape") {
+    deselectNode();
+    searchInput.blur();
+  }
+  if (e.key === "r") fitToView();
+  if (e.key === "l") document.getElementById("btn-labels").click();
+  if (e.key === "b") document.getElementById("btn-bloc").click();
+  if (e.key === "g") document.getElementById("btn-funding").click();
+  if (e.key === " ") { e.preventDefault(); document.getElementById("btn-freeze").click(); }
+});
+
+</script>
+</body>
+</html>
